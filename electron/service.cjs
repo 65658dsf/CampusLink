@@ -1,0 +1,225 @@
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { EventEmitter } = require('node:events');
+const { randomUUID } = require('node:crypto');
+const { builtinProfile, publicProfile, validateProfile, parseProfile, profileParameters, keys } = require('./profiles.cjs');
+const { runOperation } = require('./adapters.cjs');
+const { CampusError } = require('./transport.cjs');
+
+const defaults = () => ({ profileId: builtinProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, minimizeToTray: true, parameters: { operator: '1' } });
+const IDLE = () => ({ status: 'idle', message: '准备就绪，连接校园网络后即可认证。' });
+
+class CampusService extends EventEmitter {
+  constructor({ directory, safeStorage, version = '1.0.0', platform = process.platform, packaged = false, autoLaunch = () => false, operation = runOperation }) {
+    super();
+    this.directory = directory;
+    this.file = path.join(directory, 'settings.json');
+    this.safeStorage = safeStorage;
+    this.autoLaunch = autoLaunch;
+    this.operation = operation;
+    this.settings = defaults();
+    this.externalProfiles = [];
+    this.credential = null;
+    this.session = null;
+    this.busy = false;
+    this.lastStatusCheck = 0;
+    this.refreshing = false;
+    this.connection = IDLE();
+    this.logs = [];
+    this.appInfo = { version, platform, packaged, secureStorage: this.storageAvailable() };
+    this.load();
+    this.log('info', '岚连已就绪，认证操作仅在你连接或启用自动连接时执行。', false);
+  }
+  storageAvailable() {
+    try { return Boolean(this.safeStorage?.isEncryptionAvailable()) && this.safeStorage.getSelectedStorageBackend?.() !== 'basic_text'; } catch { return false; }
+  }
+  profile(id = this.settings.profileId) {
+    const value = [builtinProfile, ...this.externalProfiles].find(p => p.id === id);
+    if (!value) throw new Error('找不到连接方案，请重新选择。');
+    return value;
+  }
+  load() {
+    try {
+      if (!fs.existsSync(this.file)) return;
+      if (fs.statSync(this.file).size > 1024 * 1024) throw new Error('oversized');
+      const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      if (saved.version !== 1 || !Array.isArray(saved.profiles) || saved.profiles.length > 30) throw new Error('version');
+      this.externalProfiles = saved.profiles.map(p => validateProfile(p));
+      if (new Set(this.externalProfiles.map(p => p.id)).size !== this.externalProfiles.length) throw new Error('duplicate');
+      this.settings = this.validatedSettings({ ...defaults(), ...saved.settings });
+      const cred = saved.credential;
+      if (this.settings.rememberPassword && cred && cred.profileId === this.settings.profileId && cred.username === this.settings.username && typeof cred.encrypted === 'string' && cred.encrypted.length < 20000) this.credential = cred;
+      if (!this.credential) this.settings.autoConnect = false;
+      if (!this.appInfo.packaged) this.settings.autoLaunch = false;
+    } catch {
+      this.settings = defaults(); this.externalProfiles = []; this.credential = null;
+      this.log('warning', '本地配置无法读取，已使用默认设置。原文件将保留至下次保存。', false);
+    }
+  }
+  persist() {
+    fs.mkdirSync(this.directory, { recursive: true });
+    const temp = `${this.file}.${process.pid}.tmp`;
+    const content = JSON.stringify({ version: 1, settings: this.settings, profiles: this.externalProfiles, credential: this.settings.rememberPassword ? this.credential : null }, null, 2);
+    try { fs.writeFileSync(temp, content, { mode: 0o600 }); fs.renameSync(temp, this.file); }
+    catch { try { fs.unlinkSync(temp); } catch {} throw new Error('无法保存本地配置，请检查文件夹权限。'); }
+  }
+  log(level, message, publish = true, details) {
+    this.logs.unshift({ id: randomUUID(), time: new Date().toISOString(), level, message, ...(details ? { details } : {}) });
+    this.logs = this.logs.slice(0, 100);
+    if (publish) this.publish();
+  }
+  snapshot() {
+    return structuredClone({ settings: this.settings, hasPassword: Boolean(this.credential && this.storageAvailable()), profiles: [publicProfile(builtinProfile, true), ...this.externalProfiles.map(p => publicProfile(p))], connection: { ...this.connection, refreshing: this.refreshing, canDisconnect: Boolean(this.session || this.connection.status === 'connected') }, logs: this.logs, app: { ...this.appInfo, secureStorage: this.storageAvailable() } });
+  }
+  publish() { const value = this.snapshot(); this.emit('snapshot', value); return value; }
+  assertIdle() { if (this.busy) throw new Error('正在处理网络请求，请稍候。'); }
+  validatedSettings(input) {
+    keys(input, ['profileId', 'username', 'rememberPassword', 'autoLaunch', 'autoConnect', 'minimizeToTray', 'parameters'], '设置');
+    if (typeof input.profileId !== 'string') throw new Error('连接方案无效。');
+    const profile = this.profile(input.profileId);
+    if (typeof input.username !== 'string' || input.username.length > 200 || /[\r\n\u0000]/.test(input.username)) throw new Error('账号格式无效。');
+    for (const key of ['rememberPassword', 'autoLaunch', 'autoConnect', 'minimizeToTray']) if (typeof input[key] !== 'boolean') throw new Error('设置值无效。');
+    return { ...input, username: input.username.trim(), parameters: profileParameters(profile, input.parameters) };
+  }
+  saveSettings(patch) {
+    this.assertIdle();
+    keys(patch, ['profileId', 'username', 'rememberPassword', 'autoLaunch', 'autoConnect', 'minimizeToTray', 'parameters'], '设置');
+    const changedProfile = patch.profileId !== undefined && patch.profileId !== this.settings.profileId;
+    if (changedProfile && (this.session || this.connection.status === 'connected')) throw new Error('请先断开当前认证，再切换连接方案。');
+    const next = this.validatedSettings({ ...this.settings, ...patch, parameters: changedProfile ? (patch.parameters || {}) : (patch.parameters || this.settings.parameters) });
+    const changedIdentity = next.profileId !== this.settings.profileId || next.username !== this.settings.username;
+    if (changedIdentity && (this.session || this.connection.status === 'connected')) throw new Error('请先断开当前认证，再更改账号或连接方案。');
+    if (next.rememberPassword && !this.storageAvailable()) throw new Error('系统安全存储不可用，无法记住密码。');
+    const credential = !next.rememberPassword || changedIdentity ? null : this.credential;
+    if (patch.autoConnect === true && (!next.rememberPassword || !credential || !this.storageAvailable() || !this.decryptPassword())) throw new Error('请先勾选记住密码并成功保存账号，再启用自动连接。');
+    if (!next.rememberPassword || changedIdentity) next.autoConnect = false;
+    if (next.autoConnect && !credential) throw new Error('请先勾选记住密码并成功保存账号，再启用自动连接。');
+    if (next.autoConnect && this.profile(next.profileId).protocol === 'http' && !this.profile(next.profileId).operations.status) throw new Error('启用自动连接需要方案提供只读状态查询。');
+    if (next.autoLaunch !== this.settings.autoLaunch) next.autoLaunch = this.autoLaunch(next.autoLaunch);
+    this.credential = credential;
+    this.settings = next;
+    if (changedProfile) this.connection = IDLE();
+    this.persist();
+    return this.publish();
+  }
+  decryptPassword() {
+    if (!this.credential || !this.storageAvailable()) return '';
+    try { return this.safeStorage.decryptString(Buffer.from(this.credential.encrypted, 'base64')); }
+    catch { throw new Error('已保存的密码无法解密，请重新输入并保存。'); }
+  }
+  async connect(input) {
+    this.assertIdle();
+    keys(input, ['profileId', 'username', 'password', 'rememberPassword', 'parameters'], '连接请求');
+    if (input.password !== undefined && (typeof input.password !== 'string' || input.password.length > 1024 || /[\r\n\u0000]/.test(input.password))) throw new Error('密码格式无效。');
+    const next = this.validatedSettings({ ...this.settings, profileId: input.profileId || this.settings.profileId, username: input.username ?? this.settings.username, rememberPassword: input.rememberPassword ?? this.settings.rememberPassword, parameters: input.parameters ?? this.settings.parameters });
+    if (!next.username) throw new Error('请输入校园网账号。');
+    if (this.session || this.connection.status === 'connected') throw new Error('当前已有认证会话，请先检查状态或断开后重试。');
+    const sameIdentity = next.profileId === this.settings.profileId && next.username === this.settings.username;
+    const password = input.password || (sameIdentity ? this.decryptPassword() : '');
+    if (!password) throw new Error('请输入校园网密码。');
+    let credential = null;
+    if (next.rememberPassword) {
+      if (!this.storageAvailable()) throw new Error('系统安全存储不可用，取消记住密码后可继续连接。');
+      try { credential = { profileId: next.profileId, username: next.username, encrypted: this.safeStorage.encryptString(password).toString('base64') }; }
+      catch { throw new Error('密码加密失败，取消记住密码后可继续连接。'); }
+    } else next.autoConnect = false;
+    this.credential = credential;
+    this.settings = next;
+    this.persist();
+    const profile = this.profile();
+    this.busy = true;
+    this.connection = { status: 'connecting', message: '正在向校园网认证服务器提交认证…' };
+    this.log('info', '正在连接校园网。');
+    try {
+      const result = await this.operation(profile, 'login', { username: next.username, password, parameters: next.parameters });
+      this.session = { profileId: profile.id, username: next.username, password, parameters: next.parameters };
+      this.connection = { status: 'connected', message: result.message, ip: result.ip, since: new Date().toISOString() };
+      this.log('success', '校园网认证成功。', false);
+    } catch (error) {
+      if (error instanceof CampusError && error.code === 'VERIFY_FAILED') this.session = { profileId: profile.id, username: next.username, password, parameters: next.parameters };
+      this.connection = { status: 'error', message: this.networkError(error) }; this.log('error', this.connection.message, false, this.errorDetails(error));
+    }
+    finally { this.busy = false; }
+    return this.publish();
+  }
+  networkError(error) { return error instanceof CampusError ? error.message : '操作未完成，请检查校园网络或打开认证页重试。'; }
+  errorDetails(error) { return { code: error instanceof CampusError ? error.code : 'REQUEST_FAILED', requests: error instanceof CampusError && Array.isArray(error.diagnostics) ? error.diagnostics : [] }; }
+  async disconnect() {
+    this.assertIdle();
+    const context = this.session || { username: this.settings.username, parameters: this.settings.parameters, profileId: this.settings.profileId };
+    this.busy = true;
+    this.connection = { ...this.connection, status: 'disconnecting', message: '正在退出校园网认证…' }; this.publish();
+    try {
+      await this.operation(this.profile(context.profileId), 'logout', context);
+      this.session = null;
+      this.connection = { status: 'idle', message: '已退出校园网认证。' };
+      this.log('info', '已退出校园网认证。', false);
+    } catch (error) { this.connection = { status: 'error', message: this.networkError(error) }; this.log('error', this.connection.message, false, this.errorDetails(error)); }
+    finally { this.busy = false; }
+    return this.publish();
+  }
+  async checkStatus({ silent = false } = {}) {
+    this.assertIdle();
+    const previous = this.connection;
+    this.busy = true;
+    this.lastStatusCheck = Date.now();
+    this.refreshing = true;
+    if (!silent) this.connection = { ...previous, status: 'checking', message: '正在查询校园网认证状态…' };
+    this.publish();
+    try {
+      const result = await this.operation(this.profile(), 'status', { username: this.settings.username, parameters: this.settings.parameters });
+      this.connection = { status: result.online ? 'connected' : 'idle', message: result.message, ip: result.ip, checkedAt: new Date().toISOString(), ...(result.online && previous.since ? { since: previous.since } : {}) };
+      if (!result.online) this.session = null;
+      else if (!this.session) this.session = { profileId: this.settings.profileId, username: this.settings.username, parameters: this.settings.parameters };
+      if (!silent || previous.status !== this.connection.status) this.log(result.online ? 'success' : 'info', result.online ? '状态查询：当前已通过校园网认证。' : '状态查询：当前尚未认证。', false);
+    } catch (error) {
+      this.connection = { status: 'error', message: this.networkError(error), checkedAt: previous.checkedAt };
+      if (!silent || previous.status !== 'error' || previous.message !== this.connection.message) this.log('warning', this.connection.message, false, this.errorDetails(error));
+    }
+    finally { this.busy = false; this.refreshing = false; }
+    return this.publish();
+  }
+  async refreshStatus() {
+    // Background reads must never race an explicit authentication action or spam logs.
+    if (this.busy || Date.now() - this.lastStatusCheck < 5000) return this.snapshot();
+    return this.checkStatus({ silent: true });
+  }
+  importProfile(text) {
+    this.assertIdle();
+    const profile = parseProfile(text);
+    if (this.externalProfiles.some(p => p.id === profile.id)) throw new Error('此方案 ID 已存在，请先移除旧方案或更改 ID。');
+    if (this.externalProfiles.length >= 30) throw new Error('最多导入 30 个外部方案。');
+    this.externalProfiles.push(profile); this.persist(); this.log('success', '外部连接方案已导入。'); return this.snapshot();
+  }
+  removeProfile(id) {
+    this.assertIdle();
+    if (id === builtinProfile.id) throw new Error('内置方案不能移除。');
+    this.profile(id);
+    if (this.session?.profileId === id || (this.connection.status === 'connected' && this.settings.profileId === id)) throw new Error('请先断开当前认证，再移除方案。');
+    this.externalProfiles = this.externalProfiles.filter(p => p.id !== id);
+    if (this.settings.profileId === id) { this.settings = { ...this.settings, profileId: builtinProfile.id, parameters: { operator: '1' }, autoConnect: false }; this.credential = null; this.connection = IDLE(); }
+    this.persist(); this.log('info', '外部连接方案已移除。'); return this.snapshot();
+  }
+  clearCredentials() {
+    this.assertIdle(); this.credential = null;
+    if (this.session) delete this.session.password;
+    this.settings.rememberPassword = false; this.settings.autoConnect = false;
+    this.persist(); this.log('info', '已清除保存的密码，并关闭自动连接。'); return this.snapshot();
+  }
+  async initialize() {
+    this.log('info', '正在检查启动后的校园网认证状态。');
+    const snapshot = await this.checkStatus();
+    if (snapshot.connection.status === 'connected') return this.snapshot();
+    if (snapshot.connection.status !== 'idle' || !this.settings.autoConnect || !this.settings.rememberPassword || !this.credential) return this.snapshot();
+    this.log('info', '当前未认证，已按设置开始自动连接。');
+    return this.connect({});
+  }
+  async autoConnectIfEnabled() {
+    if (!this.settings.autoConnect || !this.settings.rememberPassword || !this.credential) return this.snapshot();
+    return this.initialize();
+  }
+}
+
+module.exports = { CampusService, defaults };

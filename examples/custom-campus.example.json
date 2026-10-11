@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "example-campus",
+  "name": "示例大学 · HTTP 表单",
+  "description": "可编辑示例；请把认证页、请求端点和响应判断替换为学校实际值。默认示例域名不可用于校园网登录。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "https://campus.example.invalid/",
+  "protocol": "http",
+  "timeoutMs": 10000,
+  "fields": [
+    { "key": "operator", "label": "运营商", "default": "campus", "options": [{ "label": "校园网", "value": "campus" }, { "label": "移动", "value": "mobile" }] }
+  ],
+  "operations": {
+    "login": {
+      "url": "https://campus.example.invalid/api/login",
+      "method": "POST",
+      "encoding": "form",
+      "data": { "username": "{{username}}", "password": "{{password}}", "operator": "{{operator}}" },
+      "success": { "type": "json", "path": "success", "equals": true },
+      "failure": { "type": "json", "path": "success", "equals": false }
+    },
+    "logout": {
+      "url": "https://campus.example.invalid/api/logout",
+      "method": "POST",
+      "encoding": "json",
+      "data": { "username": "{{username}}" },
+      "success": { "type": "json", "path": "success", "equals": true },
+      "failure": { "type": "json", "path": "success", "equals": false }
+    },
+    "status": {
+      "url": "https://campus.example.invalid/api/status",
+      "method": "GET",
+      "encoding": "form",
+      "data": {},
+      "success": { "type": "json", "path": "online", "equals": true },
+      "failure": { "type": "json", "path": "online", "equals": false }
+    }
+  }
+}
