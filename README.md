@@ -6,7 +6,7 @@
 
 开发者：**NingMeng123** · [GitHub 主页](https://github.com/65658dsf)
 
-[在线使用文档与方案制作教程](https://65658dsf.github.io/CampusLinkPages/)
+[在线使用文档与方案制作教程](https://campuslink.xzncraft.cn/)
 
 本仓库 [CampusLink](https://github.com/65658dsf/CampusLink) 保存桌面客户端源码、认证适配器和自动化测试。独立仓库 [CampusLinkPages](https://github.com/65658dsf/CampusLinkPages) 保存 Vue 文档网站源码；网站与桌面客户端分别构建和维护。
 
