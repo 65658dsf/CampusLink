@@ -171,17 +171,19 @@ test('changing account removes old credentials and disables automatic connection
   assert.equal(service.snapshot().settings.autoConnect, false);
   await assert.rejects(service.connect({}), /密码/);
 });
-test('automatic authentication is opt-in and cannot run without saved credentials', async t => {
-  let calls = 0;
-  const service = serviceFixture(t, async (_profile, operation) => { calls++; return { online: operation === 'login', message: 'ok' }; });
+test('automatic authentication is opt-in, requires saved credentials and respects manual logout', async t => {
+  const calls = [];
+  const service = serviceFixture(t, async (_profile, operation) => { calls.push(operation); return { online: operation === 'login', message: 'ok' }; });
   await service.autoConnectIfEnabled();
-  assert.equal(calls, 0);
+  assert.deepEqual(calls, []);
   assert.throws(() => service.saveSettings({ rememberPassword: true, autoConnect: true }), /密码/);
   await service.connect({ username: 'student', password: 'pw', rememberPassword: true });
   await service.disconnect();
   service.saveSettings({ autoConnect: true });
   await service.autoConnectIfEnabled();
-  assert.equal(calls, 4);
+  assert.deepEqual(calls, ['login', 'logout', 'status']);
+  assert.equal(service.snapshot().connection.reconnectPaused, true);
+  assert.equal(service.snapshot().connection.monitoring, false);
 });
 test('explicit automatic connection requests fail clearly without valid remembered credentials', async t => {
   const service = serviceFixture(t);

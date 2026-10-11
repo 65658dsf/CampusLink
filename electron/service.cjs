@@ -206,6 +206,7 @@ class CampusService extends EventEmitter {
     catch { throw new Error('已保存的密码无法解密，请重新输入并保存。'); }
   }
   async connect(input, { automatic = false } = {}) {
+    if (this.disposed) throw new Error('应用已停止，无法继续连接。');
     this.assertIdle();
     keys(input, ['profileId', 'username', 'password', 'rememberPassword', 'parameters'], '连接请求');
     if (input.password !== undefined && (typeof input.password !== 'string' || input.password.length > 1024 || /[\r\n\u0000]/.test(input.password))) throw new Error('密码格式无效。');
@@ -327,8 +328,13 @@ class CampusService extends EventEmitter {
     this.persist(); this.log('info', '已清除保存的密码，并关闭自动连接。'); return this.snapshot();
   }
   async initialize() {
+    if (this.disposed) return this.snapshot();
+    const generation = this.monitorGeneration;
     this.log('info', '正在检查启动后的校园网认证状态。');
     const snapshot = await this.checkStatus();
+    // The initial read must not authorize a later login after shutdown or a
+    // manual pause canceled this startup operation while it was in flight.
+    if (this.disposed || this.reconnectPaused || generation !== this.monitorGeneration) return this.snapshot();
     if (snapshot.connection.status === 'connected') return this.snapshot();
     if (snapshot.connection.status !== 'idle' || !this.settings.autoConnect || !this.settings.rememberPassword || !this.credential) return this.snapshot();
     this.log('info', '当前未认证，已按设置开始自动连接。');

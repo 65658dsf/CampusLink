@@ -83,6 +83,63 @@ test('an offline or unknown startup never starts first login solely because reco
   }
 });
 
+test('an uncanceled offline startup still authenticates once with its opted-in saved credential', async t => {
+  const calls = [];
+  const password = 'startup-fixture-password';
+  const settings = { ...defaults(), username: 'startup-account', rememberPassword: true, autoConnect: true };
+  const encrypted = Buffer.from([...password].reverse().join('')).toString('base64');
+  const { service, clock } = fixture(t, async (_profile, action, context) => {
+    calls.push(action);
+    if (action === 'login') assert.equal(context.password, password);
+    return { online: action === 'login', message: 'ok' };
+  }, { version: 1, settings, profiles: [], credential: { profileId: settings.profileId, username: settings.username, encrypted } });
+  await service.initialize();
+  assert.deepEqual(calls, ['status', 'login']);
+  assert.equal(service.snapshot().connection.status, 'connected');
+  assert.equal(service.snapshot().connection.monitoring, true);
+  assert.equal(clock.count, 1);
+});
+
+test('canceling an in-flight startup query prevents its saved-credential automatic login', async t => {
+  for (const cancellation of ['dispose', 'manual-logout']) {
+    let finish;
+    const calls = [];
+    const settings = { ...defaults(), username: 'startup-account', rememberPassword: true, autoConnect: true };
+    const encrypted = Buffer.from([...'startup-fixture-password'].reverse().join('')).toString('base64');
+    const { service, clock } = fixture(t, async (_profile, action) => {
+      calls.push(action);
+      if (action === 'status') return new Promise(resolve => { finish = resolve; });
+      return { online: true, message: 'online' };
+    }, { version: 1, settings, profiles: [], credential: { profileId: settings.profileId, username: settings.username, encrypted } });
+    const saved = fs.readFileSync(service.file, 'utf8');
+    const startup = service.initialize();
+    assert.equal(service.busy, true);
+    if (cancellation === 'dispose') service.dispose();
+    else await assert.rejects(service.disconnect(), /稍候/);
+    finish({ online: false, message: 'offline' });
+    await startup;
+    await clock.advance(120000);
+    assert.deepEqual(calls, ['status'], cancellation);
+    assert.equal(service.snapshot().connection.monitoring, false);
+    assert.equal(clock.count, 0);
+    assert.equal(service.session?.password, undefined);
+    assert.equal(service.reconnectContext, null);
+    assert.equal(fs.readFileSync(service.file, 'utf8'), saved);
+    if (cancellation === 'manual-logout') assert.equal(service.snapshot().connection.reconnectPaused, true);
+  }
+});
+
+test('a disposed service cannot start another initialization or explicit login', async t => {
+  const calls = [];
+  const { service, clock } = fixture(t, async (_profile, action) => { calls.push(action); return { online: false, message: 'offline' }; });
+  service.dispose();
+  await service.initialize();
+  await assert.rejects(service.connect({ username: 'startup-account', password: 'startup-fixture-password' }), /已停止/);
+  assert.deepEqual(calls, []);
+  assert.equal(clock.count, 0);
+  assert.equal(fs.existsSync(service.file), false);
+});
+
 test('successful login arms a single timer and reuses a session password without persisting it', async t => {
   let online = false;
   const calls = [];
