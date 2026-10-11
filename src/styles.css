@@ -67,6 +67,26 @@
 .response-empty{display:flex;align-items:center;gap:12px;min-height:120px;color:#90a698;padding:20px}
 .response-empty svg{flex-shrink:0}
 .response-empty p{font-size:11px;line-height:1.9}
+.guard-tip p{line-height:1.8}
+.guard-tip.active>span{background:#43a984}
+.guard-tip.paused>span{background:#c2a264}
+.guard-tip.paused p{color:#968564}
+.settings-field-label{display:block;font-size:12px;font-weight:500;color:#4d6656}
+.interval-settings{align-items:flex-start}
+.interval-settings>div:first-child{padding-top:5px;min-width:0}
+.interval-editor{width:240px;flex-shrink:0}
+.interval-controls{display:flex;align-items:center;justify-content:flex-end;gap:9px}
+.interval-controls input{width:102px;height:35px;text-align:center;font-variant-numeric:tabular-nums;font-size:12px;padding-inline:8px}
+.interval-controls input[aria-invalid=true]{border-color:#dca89b;background:#fffaf8}
+.interval-editor .field-error{color:#bb7867;font-size:10px;line-height:1.7;margin-top:7px;text-align:right}
+.guard-status{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;margin:0 0 17px;border-radius:8px;border:1px solid #e5ede7;background:#f7faf8;color:#879d8c}
+.guard-status>svg{margin-top:2px;flex-shrink:0}
+.guard-status p{font-size:10px;line-height:1.9;color:#718977}
+.guard-status p>span{display:block;font-size:9px;color:#8fa294;margin-top:4px}
+.guard-status.active{background:#eff8f2;border-color:#dfede3;color:#5a9e78}
+.guard-status.paused{background:#faf8f2;border-color:#ede6d6;color:#af9668}
+.guard-status.paused p{color:#8d8065}
+@media(max-width:650px){.interval-settings{flex-direction:column;gap:13px}.interval-editor{width:100%}.interval-controls{justify-content:flex-start}.interval-controls input{width:105px}.interval-editor .field-error{text-align:left}.guard-status{padding:12px;gap:8px}.guard-status p{font-size:9px}.guard-status p>span{font-size:8px}}
 .response-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:16px 27px;border-top:1px solid #e8efea;flex-shrink:0;background:#fbfcfb}
 .response-footer>[role=status]{margin-right:auto;font-size:10px;line-height:1.7;color:#739280}
 .response-dialog :focus-visible{outline:2px solid #299979;outline-offset:3px}

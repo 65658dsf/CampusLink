@@ -15,7 +15,6 @@ let win = null;
 let tray = null;
 let service = null;
 let quitting = false;
-let statusTimer = null;
 const indexPath = path.resolve(__dirname, '../dist/index.html');
 const indexUrl = pathToFileURL(indexPath).href;
 let devUrl = null;
@@ -134,11 +133,14 @@ function createWindow() {
     title: '岚连 · Campus Link', backgroundColor: '#f6f7fb', icon: iconImage(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, spellcheck: false, devTools: !app.isPackaged },
   });
-  win.setMenu(null);
+  if (process.platform !== 'darwin') win.setMenu(null);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
   win.webContents.on('will-attach-webview', event => event.preventDefault());
-  win.once('ready-to-show', () => { if (!process.argv.includes('--autostart')) win.show(); });
+  win.once('ready-to-show', () => {
+    const openedAtLogin = process.argv.includes('--autostart') || (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin);
+    if (!openedAtLogin) win.show();
+  });
   win.on('focus', () => { if (service) void service.refreshStatus().catch(() => {}); });
   win.on('close', event => {
     if (!quitting && service.settings.minimizeToTray && tray) { event.preventDefault(); win.hide(); }
@@ -151,30 +153,32 @@ function createWindow() {
 if (!isPrimary) app.quit();
 else {
   app.on('second-instance', showWindow);
-  app.on('before-quit', () => { quitting = true; if (statusTimer) clearInterval(statusTimer); });
+  app.on('before-quit', () => { quitting = true; service?.dispose(); });
   app.on('window-all-closed', () => { if (!tray || quitting) app.quit(); });
   app.on('activate', showWindow);
   app.whenReady().then(() => {
     service = new CampusService({
       directory: app.getPath('userData'), safeStorage, version: app.getVersion(), packaged: app.isPackaged,
       autoLaunch: enabled => {
-        if (process.platform !== 'win32') throw new Error('当前版本的开机自启动仅支持 Windows。');
-        if (!app.isPackaged) throw new Error('开发预览不注册开机自启动，请安装 Windows 正式版后设置。');
-        const options = { path: process.execPath, args: ['--autostart'] };
-        app.setLoginItemSettings({ ...options, openAtLogin: enabled, enabled });
+        if (!['win32', 'darwin'].includes(process.platform)) throw new Error('开机自启动支持 Windows 和 macOS。');
+        if (!app.isPackaged) throw new Error('开发预览不注册开机自启动，请安装正式版后设置。');
+        const options = process.platform === 'win32' ? { path: process.execPath, args: ['--autostart'] } : {};
+        app.setLoginItemSettings({ ...options, openAtLogin: enabled, ...(process.platform === 'win32' ? { enabled } : {}) });
         const actual = app.getLoginItemSettings(options).openAtLogin;
-        if (actual !== enabled) throw new Error('开机自启动设置未生效，请检查 Windows 启动应用设置。');
+        if (actual !== enabled) throw new Error('开机自启动设置未生效，请检查系统登录项或启动应用设置。');
         return actual;
       },
     });
-    if (app.isPackaged && process.platform === 'win32') service.settings.autoLaunch = app.getLoginItemSettings({ path: process.execPath, args: ['--autostart'] }).openAtLogin;
+    if (app.isPackaged && ['win32', 'darwin'].includes(process.platform)) service.settings.autoLaunch = app.getLoginItemSettings(process.platform === 'win32' ? { path: process.execPath, args: ['--autostart'] } : {}).openAtLogin;
+    if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' },
+    ]));
     configureSession(); registerIpc(); createWindow();
     tray = new Tray(iconImage().resize({ width: 20, height: 20 }));
     tray.on('double-click', showWindow);
     service.on('snapshot', snapshot => { if (win && !win.isDestroyed()) win.webContents.send('campus:snapshot', snapshot); updateTray(snapshot); });
     updateTray(service.snapshot());
     void service.initialize().catch(() => service.log('warning', '启动状态检查未完成，请点击检测网络重试。'));
-    statusTimer = setInterval(() => { void service.refreshStatus().catch(() => {}); }, 30000);
     powerMonitor.on('resume', () => { void service.refreshStatus().catch(() => {}); });
   }).catch(() => {
     dialog.showErrorBox('岚连启动失败', '无法初始化校园网连接工具，请重新安装或检查应用数据目录权限。');

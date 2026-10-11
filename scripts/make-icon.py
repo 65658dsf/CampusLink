@@ -16,8 +16,9 @@ for start, control, end in [((53, 98), (128, 36), (203, 98)), ((79, 128), (128, 
         r = 7.5 * scale
         draw.ellipse((x-r, y-r, x+r, y+r), fill='white')
 draw.ellipse((118*scale, 176*scale, 138*scale, 196*scale), fill='white')
-image = image.resize((256, 256), Image.Resampling.LANCZOS)
 assets = Path(__file__).resolve().parent.parent / 'assets'
 assets.mkdir(exist_ok=True)
+image.save(assets / 'icon-mac.png')
+image = image.resize((256, 256), Image.Resampling.LANCZOS)
 image.save(assets / 'icon.png')
 image.save(assets / 'icon.ico', sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])

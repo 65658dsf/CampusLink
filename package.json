@@ -1,9 +1,9 @@
 {
   "name": "campus-link",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "岚连 · 可扩展的 Windows 校园网连接工具",
+  "description": "岚连 · 可扩展的 Windows / macOS 校园网连接工具",
   "author": "NingMeng123",
   "homepage": "https://github.com/65658dsf/CampusLink",
   "main": "electron/main.cjs",
@@ -15,8 +15,12 @@
     "start": "electron .",
     "test": "node --test tests/*.test.cjs",
     "test:desktop": "node scripts/smoke-desktop.cjs",
-    "dist:win": "npm run build && electron-builder --win nsis --x64",
-    "pack:win": "npm run build && electron-builder --win --x64 --dir"
+    "test:release": "node --test scripts/release/release.test.cjs",
+    "dist:win": "npm run build && node scripts/release/build.cjs win x64",
+    "pack:win": "npm run build && electron-builder --win --x64 --dir --publish never",
+    "dist:mac": "npm run build && node scripts/release/build.cjs mac x64 && node scripts/release/build.cjs mac arm64",
+    "dist:mac:x64": "npm run build && node scripts/release/build.cjs mac x64",
+    "dist:mac:arm64": "npm run build && node scripts/release/build.cjs mac arm64"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",
@@ -52,6 +56,13 @@
       "target": "nsis",
       "icon": "assets/icon.ico",
       "artifactName": "Campus-Link-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "assets/icon-mac.png",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "artifactName": "Campus-Link-${version}-mac-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
