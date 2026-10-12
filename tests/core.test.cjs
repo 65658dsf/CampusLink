@@ -6,7 +6,10 @@ const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parseProfile, validateProfile, builtinProfile, MAX_PROFILE_BYTES } = require('../electron/profiles.cjs');
+const { parseProfile, validateProfile, builtinProfile: builtinDrcomProfile, builtinProfiles, MAX_PROFILE_BYTES } = require('../electron/profiles.cjs');
+// Keep legacy Dr.COM protocol fixtures fixed to their mocked authentication host.
+const builtinProfile = structuredClone(builtinDrcomProfile);
+delete builtinProfile.portalDiscovery;
 const { request, parseJsonOrJsonp, CampusError } = require('../electron/transport.cjs');
 const { runOperation } = require('../electron/adapters.cjs');
 const { CampusService } = require('../electron/service.cjs');
@@ -226,7 +229,7 @@ test('concurrent actions are blocked and credentials clear disables auto connect
 test('import supports portable declarative profiles and protects built-in and duplicate IDs', t => {
   const service = serviceFixture(t);
   service.importProfile(JSON.stringify(example));
-  assert.equal(service.snapshot().profiles.length, 2);
+  assert.equal(service.snapshot().profiles.length, builtinProfiles.length + 1);
   assert.throws(() => service.importProfile(JSON.stringify(example)), /已存在/);
   assert.throws(() => service.removeProfile(builtinProfile.id), /内置/);
   service.saveSettings({ profileId: example.id });

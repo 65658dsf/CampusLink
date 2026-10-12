@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { randomUUID } = require('node:crypto');
-const { builtinProfile, publicProfile, validateProfile, parseProfile, profileParameters, keys } = require('./profiles.cjs');
+const { builtinProfile, builtinProfiles, publicProfile, validateProfile, parseProfile, profileParameters, keys } = require('./profiles.cjs');
 const { runOperation } = require('./adapters.cjs');
 const { CampusError } = require('./transport.cjs');
 
@@ -122,7 +122,7 @@ class CampusService extends EventEmitter {
     if (this.session) delete this.session.password;
   }
   profile(id = this.settings.profileId) {
-    const value = [builtinProfile, ...this.externalProfiles].find(p => p.id === id);
+    const value = [...builtinProfiles, ...this.externalProfiles].find(p => p.id === id);
     if (!value) throw new Error('找不到连接方案，请重新选择。');
     return value;
   }
@@ -157,7 +157,7 @@ class CampusService extends EventEmitter {
     if (publish) this.publish();
   }
   snapshot() {
-    return structuredClone({ settings: this.settings, hasPassword: Boolean(this.credential && this.storageAvailable()), profiles: [publicProfile(builtinProfile, true), ...this.externalProfiles.map(p => publicProfile(p))], connection: { ...this.connection, refreshing: this.refreshing, canDisconnect: Boolean(this.session || this.connection.status === 'connected'), monitoring: this.monitoring(), reconnectPaused: this.reconnectPaused }, logs: this.logs, app: { ...this.appInfo, secureStorage: this.storageAvailable() } });
+    return structuredClone({ settings: this.settings, hasPassword: Boolean(this.credential && this.storageAvailable()), profiles: [...builtinProfiles.map(p => publicProfile(p, true)), ...this.externalProfiles.map(p => publicProfile(p))], connection: { ...this.connection, refreshing: this.refreshing, canDisconnect: Boolean(this.session || this.connection.status === 'connected'), monitoring: this.monitoring(), reconnectPaused: this.reconnectPaused }, logs: this.logs, app: { ...this.appInfo, secureStorage: this.storageAvailable() } });
   }
   publish() { const value = this.snapshot(); this.emit('snapshot', value); return value; }
   assertIdle() { if (this.busy) throw new Error('正在处理网络请求，请稍候。'); }
@@ -239,7 +239,7 @@ class CampusService extends EventEmitter {
       const result = await this.operation(profile, 'login', { username: next.username, password, parameters: next.parameters });
       if (this.disposed) return this.snapshot();
       this.session = { profileId: profile.id, username: next.username, password, parameters: next.parameters };
-      this.connection = { status: 'connected', message: result.message, ip: result.ip, since: new Date().toISOString() };
+      this.connection = { status: 'connected', message: result.message, ip: result.ip, portalUrl: result.portalUrl, since: new Date().toISOString() };
       if (generation === this.monitorGeneration && !this.disposed) {
         if (!automatic) this.reconnectPaused = false;
         this.reconnectContext = { ...this.session };
@@ -249,6 +249,7 @@ class CampusService extends EventEmitter {
       this.log('success', '校园网认证成功。', false);
     } catch (error) {
       if (!this.disposed && error instanceof CampusError && error.code === 'VERIFY_FAILED') this.session = { profileId: profile.id, username: next.username, password, parameters: next.parameters };
+      if (error instanceof CampusError && error.code === 'CAPTCHA_REQUIRED') { this.stopMonitoring(); this.reconnectContext = null; }
       this.connection = { status: 'error', message: this.networkError(error) }; this.log('error', this.connection.message, false, this.errorDetails(error));
     }
     finally { this.busy = false; this.lastStatusCheck = this.now(); this.scheduleMonitor(); }
@@ -286,7 +287,7 @@ class CampusService extends EventEmitter {
     this.publish();
     try {
       const result = await this.operation(this.profile(), 'status', { username: this.settings.username, parameters: this.settings.parameters });
-      this.connection = { status: result.online ? 'connected' : 'idle', message: result.message, ip: result.ip, checkedAt: new Date().toISOString(), ...(result.online && previous.since ? { since: previous.since } : {}) };
+      this.connection = { status: result.online ? 'connected' : 'idle', message: result.message, ip: result.ip, portalUrl: result.portalUrl, checkedAt: new Date().toISOString(), ...(result.online && previous.since ? { since: previous.since } : {}) };
       if (!result.online) this.session = null;
       else if (!this.session) this.session = { profileId: this.settings.profileId, username: this.settings.username, parameters: this.settings.parameters };
       if (result.online) this.armMonitoring();
@@ -312,7 +313,7 @@ class CampusService extends EventEmitter {
   }
   removeProfile(id) {
     this.assertIdle();
-    if (id === builtinProfile.id) throw new Error('内置方案不能移除。');
+    if (builtinProfiles.some(p => p.id === id)) throw new Error('内置方案不能移除。');
     this.profile(id);
     if (this.session?.profileId === id || (this.connection.status === 'connected' && this.settings.profileId === id)) throw new Error('请先断开当前认证，再移除方案。');
     this.externalProfiles = this.externalProfiles.filter(p => p.id !== id);

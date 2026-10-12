@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "example-ruijie-campus",
+  "name": "示例大学 · 锐捷 ePortal（需修改）",
+  "description": "仅作结构演示：自动发现当前网络的锐捷认证页；备用认证地址、备用网关发现地址、跳转来源、RSA 公钥和 service 值必须改为学校实际配置。示例公钥不可用于实际认证；.invalid 地址仅作占位。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "https://campus.example.invalid/",
+  "protocol": "ruijie",
+  "timeoutMs": 10000,
+  "fields": [
+    {
+      "key": "service",
+      "label": "网络服务",
+      "default": "internet",
+      "placeholder": "请填写认证页实际服务名称"
+    }
+  ],
+  "ruijie": {
+    "discoveryUrl": "https://campus.example.invalid/",
+    "redirectOrigins": [
+      "https://portal.example.invalid"
+    ],
+    "publicKey": {
+      "modulus": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "exponent": "10001"
+    },
+    "serviceEncoding": "plain"
+  },
+  "portalDiscovery": {
+    "url": "http://www.msftconnecttest.com/redirect"
+  }
+}

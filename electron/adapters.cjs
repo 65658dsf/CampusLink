@@ -2,6 +2,31 @@
 
 const { request, parseJsonOrJsonp, CampusError } = require('./transport.cjs');
 const { createDiagnostic, sanitizeText } = require('./diagnostics.cjs');
+const { ruijieOperation } = require('./ruijie.cjs');
+const { portalRequest } = require('./portal-transport.cjs');
+const { discoverPortal } = require('./portal-discovery.cjs');
+
+// Only endpoint origins are retained for the lifetime of this process. Device
+// query strings and cookies never enter settings, public profiles or the cache.
+const discoveredPortals = new Map();
+async function resolvePortalProfile(profile, requester) {
+  if (!profile.portalDiscovery) return profile;
+  const key = JSON.stringify([profile.id, profile.homepage, profile.protocol, profile.portalDiscovery.url]);
+  const found = await discoverPortal(profile, requester);
+  if (found) {
+    if (discoveredPortals.size >= 32) discoveredPortals.delete(discoveredPortals.keys().next().value);
+    discoveredPortals.set(key, { homepage: found.homepage, redirectOrigins: found.redirectOrigins });
+  }
+  const endpoint = found || discoveredPortals.get(key);
+  if (!endpoint) return profile;
+  return {
+    ...profile, homepage: endpoint.homepage,
+    ...(profile.protocol === 'ruijie' ? {
+      ruijie: { ...profile.ruijie, discoveryUrl: endpoint.homepage, redirectOrigins: [...new Set([...(profile.ruijie.redirectOrigins || []), ...endpoint.redirectOrigins])] },
+      ...(found ? { discoveredEntry: found.entryUrl } : {}),
+    } : {}),
+  };
+}
 
 function renderTemplate(value, variables) {
   return value.replace(/\{\{([A-Za-z][A-Za-z0-9_]*)\}\}/g, (_, key) => String(variables[key] ?? ''));
@@ -112,15 +137,17 @@ async function drcomOperation(profile, operation, context, requester = request) 
   if (verified.online !== (operation === 'login')) throw new CampusError(operation === 'login' ? '认证请求已被接受，但尚未确认在线，请检查状态或打开认证页。' : '注销请求已被接受，但状态仍显示在线，请检查状态或打开认证页。', 'VERIFY_FAILED');
   return { ...result, ip: verified.ip };
 }
-async function runOperation(profile, operation, context = {}, requester = request) {
+async function runOperation(profile, operation, context = {}, requester) {
   const diagnostics = [];
   const secrets = [context.username, context.password].filter(value => typeof value === 'string' && value.length);
   const observedRequest = async (url, options, timeout) => {
+    for (const value of options.diagnosticSecrets || []) if (typeof value === 'string' && value && !secrets.includes(value)) secrets.push(value);
     const started = Date.now();
     let captured = false;
     const observedOptions = { ...options, diagnosticSecrets: secrets, onDiagnostic: detail => { captured = true; diagnostics.push(detail); } };
     try {
-      const text = await requester(url, observedOptions, timeout);
+      const transport = requester || (profile.protocol === 'ruijie' || options.allowRedirect ? portalRequest : request);
+      const text = await transport(url, observedOptions, timeout);
       // Custom/mock transports can keep returning text; still provide useful context.
       if (!captured) diagnostics.push(createDiagnostic(url, observedOptions, { responseBody: text, durationMs: Date.now() - started }));
       return text;
@@ -130,11 +157,16 @@ async function runOperation(profile, operation, context = {}, requester = reques
     }
   };
   try {
-    return await (profile.protocol === 'drcom' ? drcomOperation(profile, operation, context, observedRequest) : genericOperation(profile, operation, context, observedRequest));
+    const effectiveProfile = await resolvePortalProfile(profile, observedRequest);
+    const adapter = profile.protocol === 'drcom' ? drcomOperation : profile.protocol === 'ruijie' ? ruijieOperation : genericOperation;
+    const result = await adapter(effectiveProfile, operation, context, observedRequest, value => { if (!secrets.includes(value)) secrets.push(value); });
+    return { ...result, portalUrl: new URL(effectiveProfile.homepage).origin + '/' };
   } catch (error) {
     const safeError = error instanceof CampusError ? error : new CampusError('操作未完成，请检查校园网络或打开认证页重试。');
     safeError.message = sanitizeText(safeError.message, secrets);
-    safeError.diagnostics = diagnostics.slice(-6);
+    // A later discovery response may identify a session token that appeared in
+    // an earlier HTML response. Reapply the final secret set before publishing.
+    safeError.diagnostics = diagnostics.slice(-6).map(detail => createDiagnostic(detail.url, { method: detail.method, diagnosticSecrets: secrets }, detail));
     throw safeError;
   }
 }

@@ -2,7 +2,7 @@
 
 面向 Windows 和 macOS 的校园网认证工具，使用 Electron、React 和 TypeScript 构建。提供扁平化中文界面、连接状态、系统托盘、可配置的开机自启动，以及通过 JSON 导入的校园网连接方案。
 
-内置贵州轻工职业大学的认证配置，入口为 <http://10.151.253.10/>。本工具是独立的校园网辅助工具，与学校或认证服务商没有官方隶属关系。
+内置贵州轻工职业大学的 Dr.COM 配置（默认方案）和四川大学的锐捷 ePortal Web 配置；其他学校可导入对应 JSON 方案。两种内置方案优先通过 `http://www.msftconnecttest.com/redirect` 只读探测当前网络的真实认证地址，原有学校地址保留为已知回退入口。本工具是独立的校园网辅助工具，与学校或认证服务商没有官方隶属关系。
 
 开发者：**NingMeng123** · [GitHub 主页](https://github.com/65658dsf)
 
@@ -12,19 +12,19 @@
 
 ## 安装和首次连接
 
-在 [GitHub Releases](https://github.com/65658dsf/CampusLink/releases) 按系统和处理器选择安装包。v1.1.0 的构建目标为：
+在 [GitHub Releases](https://github.com/65658dsf/CampusLink/releases) 按系统和处理器选择安装包。v1.1.1 的构建目标为：
 
 ```text
-Campus-Link-Setup-1.1.0.exe          Windows x64
-Campus-Link-1.1.0-mac-x64.dmg        Intel Mac
-Campus-Link-1.1.0-mac-arm64.dmg      Apple Silicon Mac
+Campus-Link-Setup-1.1.1.exe          Windows x64
+Campus-Link-1.1.1-mac-x64.dmg        Intel Mac
+Campus-Link-1.1.1-mac-arm64.dmg      Apple Silicon Mac
 ```
 
 macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程序”，再从该目录运行。默认构建未配置开发者签名或 Apple 公证，系统可能阻止打开；请核对来源并按照系统提示处理，不要关闭系统安全保护。未签名或未公证时，macOS 开机自启动也可能不可用。macOS 打包与系统行为仍需对应设备验证，不能将 CI 产物视为已完成校园网实测。
 
 1. Windows 运行安装程序并选择安装位置；macOS 安装到“应用程序”，然后打开“岚连 Campus Link”。
 2. 先在系统中连接校园 Wi-Fi，或插入校园网网线。本工具完成网络认证，不代替操作系统的无线网络连接功能。
-3. 在“连接概览”选择“贵州轻工职业大学”，网络类型保持“校园网”。
+3. 在“连接概览”选择对应学校。贵州轻工职业大学的网络类型保持“校园网”；四川大学选择“锐捷 ePortal”方案及账号已开通的网络服务，其他学校请导入匹配方案。
 4. 应用启动后会自动检测当前认证状态。若已通过认证，直接显示“已登录校园网”和会话详情，不再显示账号密码表单，也无须重复登录。
 5. 尚未认证时，输入学校提供的账号、密码，按需勾选“记住密码”，再点击连接按钮。
 
@@ -36,13 +36,14 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 | --- | --- |
 | 连接和断开 | 在连接概览提交认证，已连接时可注销 |
 | 状态查询 | 启动时检测；网络守护开启后按设定间隔检查，也可手动“检测网络” |
+| 认证地址发现 | 内置 Dr.COM / 锐捷方案优先只读探测当前校园网入口，未识别到门户时回退已知学校地址 |
 | 开机自启动 | 在“连接偏好”或“应用设置”中开启；需要安装后的桌面版本，macOS 还受签名及系统登录项许可影响 |
 | 启动后自动连接 | 先保存账号密码，再单独开启；会先查询认证状态 |
 | 断线自动重连 | 默认开启，成功认证或确认在线后开始守护；明确离线时用可用凭据尝试恢复 |
 | 检测间隔 | 应用设置中配置 5–3600 秒，默认 30 秒 |
 | 关闭到托盘 | 默认开启，可在应用设置中关闭；Windows 使用系统托盘，macOS 使用菜单栏图标 |
 | 外部方案 | 在“连接方案”导入 JSON、选择方案或移除外部方案 |
-| 方案示例 | “连接方案”中的“导出方案示例” |
+| 方案示例 | “连接方案”中的“导出方案示例”（HTTP）或“导出锐捷示例” |
 | 活动日志 | 查看、按级别筛选和复制本次运行的最近 100 条记录；点击“查看响应”展开请求与服务器响应详情 |
 | 清除密码 | “应用设置 → 账号与隐私 → 清除密码” |
 
@@ -51,6 +52,8 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 “开机自启动”和“启动后自动连接”默认关闭，分别控制启动应用和启动时提交认证。只开启自启动不会替你登录。启动后自动连接仅在启动检查确认未认证时登录；已在线则跳过，状态查询失败则停止本次启动认证。
 
 “断线自动重连”独立控制持续守护，可使用本次成功连接留在内存中的密码，或安全保存的密码；没有可用凭据时只检测并提示手动连接。手动注销立即暂停守护，再次手动连接成功后恢复。关闭自动重连会停止周期检测；检测间隔修改后按新值运行。退出应用会停止守护，但不会替你注销校园网。
+
+认证地址发现不会向 Microsoft 提交账号密码。正常访问探测地址后跳转到 MSN、Bing 或返回普通网页，不代表已经通过校园网认证；应用只使用符合当前方案协议特征的真实门户进行认证和状态检查。没有发现新入口时，优先复用本次运行中已识别的来源，没有缓存则使用方案的已知入口。缓存不保存临时 `queryString`、MAC 或设备参数，退出后不持久化。
 
 ## 贵州轻工职业大学适配情况
 
@@ -79,14 +82,18 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 
 ## 扩展其它校园网
 
-应用支持**声明式 HTTP 方案**：在 JSON 中指定认证地址、GET/POST 参数、自定义表单字段，以及响应的成功和失败判断。它不加载或执行导入文件中的 JavaScript、Python 或可执行程序。
+应用支持两类**声明式 JSON 方案**：`http` 用于固定 GET/POST 接口与响应规则；`ruijie` 使用受控的锐捷 ePortal Web 适配器，自动获取当前认证参数并完成 RSA 密码变换。它不加载或执行导入文件中的 JavaScript、Python 或可执行程序。
 
-1. 在“连接方案”点击“导出方案示例”，或复制 [custom-campus.example.json](examples/custom-campus.example.json)。
+1. 固定 HTTP 接口点击“导出方案示例”，或复制 [custom-campus.example.json](examples/custom-campus.example.json)；锐捷 ePortal 点击“导出锐捷示例”，或复制 [ruijie-campus.example.json](examples/ruijie-campus.example.json)。
 2. 根据学校真实认证接口修改地址、请求参数和响应规则。示例中的 `.invalid` 域名是占位符，不能直接登录；其中运营商选项也只是格式示例。
 3. 点击“导入连接方案”，选择 UTF-8 JSON 文件。
 4. 在列表中点击“使用此方案”，填写账号和自定义参数，再按需检测、连接。
 
-单文件最多 64 KB，可导入最多 30 个外部方案。导入不会自动认证，也不会自动覆盖相同 ID 的旧方案。完整示例、字段定义和能力边界见 [扩展方案指南](docs/plugin-guide.md)。
+单文件最多 64 KB，可导入最多 30 个外部方案。导入不会自动认证，也不会自动覆盖相同 ID 的旧方案。通用字段与 HTTP 请求规则见 [扩展方案指南](docs/plugin-guide.md)；锐捷入口发现、抓包、服务编码、公钥配置和完整制作步骤见 [锐捷方案教程](docs/ruijie-guide.md)。
+
+内置四川大学方案参考上游 ePortal Web 实现，支持确认在线、登录、注销及现有网络守护流程。它不是所有锐捷校园网的通用配置，也不支持锐捷 802.1X 客户端认证；其他学校需要替换入口、跳转源、服务值和公钥。当前只完成源码对照与本地模拟服务验证，**未在四川大学真实网络验证**。来源提交和第三方许可见 [锐捷方案教程](docs/ruijie-guide.md#参考来源与许可) 与 [第三方声明](assets/licenses/README.md)。
+
+`drcom` / `ruijie` 方案可使用顶层 `portalDiscovery: { "url": "http://www.msftconnecttest.com/redirect" }` 开启网络入口发现；内置方案和锐捷示例默认配置。`homepage` 仍是必须填写的已知回退地址，`ruijie.discoveryUrl` 保留为与它同源的已知发现入口。发现功能不会自动识别所有校园网协议，也不会替你选择其他学校的服务或 RSA 公钥。v1.1.1 的完整更新与验收边界见 [发布说明](docs/releases-v1.1.1.md)。
 
 ## 本地开发
 
@@ -130,13 +137,13 @@ npm test
 npm run dist:win
 ```
 
-安装程序输出到 `release/Campus-Link-Setup-1.1.0.exe`；只构建应用目录时，入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包必须在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。所有打包命令明确禁用自动上传。`dist/` 是界面构建产物，不能替代完整桌面程序。
+安装程序输出到 `release/Campus-Link-Setup-1.1.1.exe`；只构建应用目录时，入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包必须在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。所有打包命令明确禁用自动上传。`dist/` 是界面构建产物，不能替代完整桌面程序。
 
 自动化测试使用本机模拟服务和模拟凭据，覆盖方案校验、HTTP 编码、JSONP 解析、响应判定、加密存储流程、自动连接约束等。测试不会向真实校园网提交认证或注销，也不能替代真实账号的连接验收。
 
 ## GitHub Actions 自动发布
 
-推送到 `main` 或提交 PR 会运行 Linux 单元测试、发布流程检查和界面构建。发布版本时，将 `package.json` 与 `package-lock.json` 的版本一起更新并合入 `main`，再推送匹配的标签，例如 `v1.1.0`。工作流确认标签提交属于 `main` 后，分别在 Windows、Intel Mac 和 Apple Silicon Mac runner 构建；全部成功后由独立发布任务统一上传到 GitHub Releases。
+推送到 `main` 或提交 PR 会运行 Linux 单元测试、发布流程检查和界面构建。发布版本时，将 `package.json` 与 `package-lock.json` 的版本一起更新并合入 `main`，再推送匹配的标签，例如 `v1.1.1`。工作流确认标签提交属于 `main` 后，分别在 Windows、Intel Mac 和 Apple Silicon Mac runner 构建；全部成功后由独立发布任务统一上传到 GitHub Releases。
 
 普通提交不会创建 Release。也可在 Actions → Desktop CI and Release → Run workflow 中选择 `main`，输入已存在且版本匹配的标签重试。没有 Apple secrets 时仍会生成未签名产物；配置完整证书及公证凭据后才启用对应步骤。完整配置、发布命令和失败恢复见 [发布指南](docs/releases.md)。
 
@@ -165,6 +172,7 @@ npm run dist:win
 | `electron/service.cjs` | 设置、凭据、连接状态和方案管理 |
 | `electron/profiles.cjs` | 内置方案及外部 JSON 校验 |
 | `electron/adapters.cjs` | Dr.COM 与通用 HTTP 认证适配 |
+| `electron/ruijie.cjs` | 锐捷 ePortal 入口发现、RSA 密码变换及认证状态确认 |
 | `electron/transport.cjs` | 超时、响应大小限制、JSONP 数据解析 |
 | `electron/diagnostics.cjs` | 请求诊断、敏感信息脱敏与响应正文大小限制 |
 | `examples/` | 可导出的方案示例 |

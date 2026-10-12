@@ -41,8 +41,9 @@ function prepareAssets(directory, version, sha) {
   return { assets, builds };
 }
 
-function releaseNotes(version, builds, generatedNotes = '') {
+function releaseNotes(version, builds, generatedNotes = '', { authored = false } = {}) {
   const mac = builds.filter(item => item.platform === 'mac').map(item => `- macOS ${item.arch}：${item.signing === 'unsigned' ? '未签名、未公证' : item.notarized ? '使用 Developer ID 签名，并已完成构建公证步骤' : '使用 Developer ID 签名，未公证'}。`);
+  if (authored) return [generatedNotes.trim(), '', '## 本次构建签名记录', '', '- Windows x64：未签名。', ...mac, '', '源码提交及校验值见随版本提供的 `build-info.json` 和 `SHA256SUMS.txt`。', ''].join('\n');
   const changes = version === '1.1.0' ? [
     '## 本版更新', '',
     '- 新增断线自动重连：成功认证或确认在线后持续检测，只在明确离线时使用本次会话或已保存的凭据重连。',
@@ -73,8 +74,9 @@ function main() {
   if (remoteSha !== sha) throw new Error('The remote release tag moved after validation; nothing was published.');
   const { assets, builds } = prepareAssets(directory, version, sha);
   const notes = path.join(directory, 'release-notes.md');
-  const generatedNotes = version === '1.1.0' ? '' : gh('api', `repos/${process.env.GH_REPO}/releases/generate-notes`, '-f', `tag_name=${tag}`, '--jq', '.body');
-  fs.writeFileSync(notes, releaseNotes(version, builds, generatedNotes));
+  const authoredNotes = path.resolve(__dirname, '../../docs', `releases-v${version}.md`);
+  const generatedNotes = fs.existsSync(authoredNotes) ? fs.readFileSync(authoredNotes, 'utf8') : version === '1.1.0' ? '' : gh('api', `repos/${process.env.GH_REPO}/releases/generate-notes`, '-f', `tag_name=${tag}`, '--jq', '.body');
+  fs.writeFileSync(notes, releaseNotes(version, builds, generatedNotes, { authored: fs.existsSync(authoredNotes) }));
   const existing = JSON.parse(gh('release', 'list', '--limit', '1000', '--json', 'tagName,isDraft')).find(item => item.tagName === tag);
   if (existing && !existing.isDraft) throw new Error('This version is already published. Do not overwrite it; release a new version.');
   if (!existing) gh('release', 'create', tag, '--verify-tag', '--draft', '--title', `岚连 Campus Link ${tag}`, '--notes-file', notes);

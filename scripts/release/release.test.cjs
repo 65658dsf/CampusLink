@@ -83,3 +83,11 @@ test('missing, foreign or unexpected assets cannot be published', t => {
   const extra = assetFixture(t); fs.writeFileSync(path.join(extra.directory, 'private.txt'), 'not a release artifact');
   assert.throws(() => prepareAssets(extra.directory, extra.version, extra.sha), /Unexpected/);
 });
+
+test('authored release notes retain one title and append actual signing metadata', () => {
+  const authored = '# 岚连 Campus Link v1.1.1\n\n新增锐捷与认证入口发现。';
+  const notes = releaseNotes('1.1.1', [{ platform: 'mac', arch: 'arm64', signing: 'unsigned', notarized: false }], authored, { authored: true });
+  assert.equal(notes.split('# 岚连 Campus Link v1.1.1').length, 2);
+  assert.match(notes, /新增锐捷与认证入口发现/);
+  assert.match(notes, /macOS arm64：未签名、未公证/);
+});

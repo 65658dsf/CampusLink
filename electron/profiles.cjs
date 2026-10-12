@@ -3,6 +3,7 @@
 const MAX_PROFILE_BYTES = 64 * 1024;
 const RESERVED = new Set(['__proto__', 'prototype', 'constructor']);
 const BASE_VARIABLES = ['username', 'password', 'ip', 'mac', 'acIp', 'acName'];
+const DEFAULT_PORTAL_DISCOVERY_URL = 'http://www.msftconnecttest.com/redirect';
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -68,8 +69,34 @@ function validateOperation(op, name, origin, variables) {
   validateRule(op.failure);
   if (JSON.stringify(op.success) === JSON.stringify(op.failure)) fail('成功与失败判断不可相同');
 }
+function validateRuijie(value, homepage, fields) {
+  keys(value, ['discoveryUrl', 'redirectOrigins', 'publicKey', 'serviceEncoding'], 'ruijie');
+  if (value.discoveryUrl !== undefined && safeUrl(value.discoveryUrl, '锐捷发现地址').origin !== homepage.origin) fail('锐捷发现地址必须与认证页同源');
+  if (value.redirectOrigins !== undefined) {
+    if (!Array.isArray(value.redirectOrigins) || value.redirectOrigins.length > 8) fail('锐捷跳转来源最多 8 项');
+    for (const origin of value.redirectOrigins) {
+      const parsed = safeUrl(origin, '锐捷跳转来源');
+      if (origin !== parsed.origin) fail('锐捷跳转来源必须是完整 origin，不可包含路径、查询参数或尾部斜杠');
+    }
+    if (new Set(value.redirectOrigins).size !== value.redirectOrigins.length) fail('锐捷跳转来源不可重复');
+  }
+  keys(value.publicKey, ['modulus', 'exponent'], '锐捷 RSA 公钥');
+  const { modulus, exponent } = value.publicKey;
+  // Bound input before BigInt conversion: imported files must not create expensive integers.
+  if (typeof modulus !== 'string' || modulus.length > 1024 || !/^[0-9a-f]+$/i.test(modulus)) fail('RSA 模数必须为不超过 1024 位的十六进制字符串');
+  const modulusValue = BigInt(`0x${modulus}`);
+  const bits = modulusValue.toString(2).length;
+  if (bits < 512 || bits > 4096 || modulusValue % 2n !== 1n) fail('RSA 模数必须为 512–4096 bit 的奇数');
+  if (typeof exponent !== 'string' || exponent.length > 8 || !/^[0-9a-f]+$/i.test(exponent)) fail('RSA 指数必须为不超过 8 位的十六进制字符串');
+  const exponentValue = BigInt(`0x${exponent}`);
+  if (exponentValue < 3n || exponentValue > 0xffffffffn || exponentValue % 2n !== 1n) fail('RSA 指数必须为 3–0xffffffff 的奇数');
+  if (value.serviceEncoding !== undefined && !['plain', 'percent'].includes(value.serviceEncoding)) fail('serviceEncoding 必须为 plain 或 percent');
+  const service = fields?.find(field => field.key === 'service');
+  if (!service || (service.default === undefined && !service.options)) fail('锐捷方案必须声明 service 字符串字段，并提供默认值或选项');
+  if ((service.default !== undefined && !service.default.trim()) || service.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
+}
 function validateProfile(value, { builtin = false } = {}) {
-  keys(value, ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations'], '连接方案');
+  keys(value, ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'portalDiscovery'], '连接方案');
   if (value.schemaVersion !== 1) fail('仅支持 schemaVersion: 1');
   string(value.id, '方案 ID', 64);
   if (!/^[a-z][a-z0-9-]{2,63}$/.test(value.id) || (!builtin && value.id.startsWith('builtin-'))) fail('方案 ID 必须为小写字母、数字和连字符，且不能占用 builtin- 前缀');
@@ -78,8 +105,14 @@ function validateProfile(value, { builtin = false } = {}) {
   string(value.version, '版本', 32);
   string(value.author, '作者', 80, true);
   const homepage = safeUrl(value.homepage, '认证页地址');
-  if (!['drcom', 'http'].includes(value.protocol)) fail('protocol 仅支持 drcom / http');
-  if (value.protocol === 'drcom' && !builtin) fail('外部方案请使用声明式 http 协议');
+  if (!['drcom', 'http', 'ruijie'].includes(value.protocol)) fail('protocol 仅支持 drcom / http / ruijie');
+  if (value.protocol === 'drcom' && !builtin) fail('外部方案请使用声明式 http 或 ruijie 协议');
+  if (value.protocol !== 'ruijie' && Object.hasOwn(value, 'ruijie')) fail('仅锐捷方案可声明 ruijie 配置');
+  if (Object.hasOwn(value, 'portalDiscovery')) {
+    if (!['drcom', 'ruijie'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie 方案');
+    keys(value.portalDiscovery, ['url'], '认证页自动发现');
+    safeUrl(value.portalDiscovery.url, '认证页发现地址');
+  }
   if (value.timeoutMs !== undefined && (!Number.isInteger(value.timeoutMs) || value.timeoutMs < 1000 || value.timeoutMs > 30000)) fail('timeoutMs 必须在 1000–30000 毫秒之间');
   const variables = new Set(BASE_VARIABLES);
   if (value.fields !== undefined) {
@@ -107,8 +140,15 @@ function validateProfile(value, { builtin = false } = {}) {
     keys(value.operations, ['login', 'logout', 'status'], 'operations');
     for (const name of ['login', 'logout', 'status']) if (!value.operations[name]) fail(`缺少 ${name} 请求；v1 方案须完整提供登录、注销与只读状态查询`);
     for (const name of Object.keys(value.operations)) validateOperation(value.operations[name], name, homepage.origin, variables);
-  } else if (value.operations !== undefined) fail('内置 drcom 方案不允许覆写请求');
-  return JSON.parse(JSON.stringify(value));
+  } else if (Object.hasOwn(value, 'operations')) fail('drcom / ruijie 方案不允许覆写 operations 请求');
+  if (value.protocol === 'ruijie') validateRuijie(value.ruijie, homepage, value.fields);
+  const result = JSON.parse(JSON.stringify(value));
+  if (result.protocol === 'ruijie') {
+    result.ruijie.discoveryUrl ??= result.homepage;
+    result.ruijie.redirectOrigins ??= [];
+    result.ruijie.serviceEncoding ??= 'plain';
+  }
+  return result;
 }
 function parseProfile(text) {
   if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > MAX_PROFILE_BYTES) fail('连接方案文件不能超过 64 KB');
@@ -117,8 +157,8 @@ function parseProfile(text) {
   return validateProfile(value);
 }
 function publicProfile(profile, builtin = false) {
-  const { id, name, description = '', version, author = '', homepage, protocol, fields = [] } = profile;
-  return { id, name, description, version, author, homepage, protocol, fields, builtin };
+  const { id, name, description = '', version, author = '', homepage, protocol, fields = [], portalDiscovery } = profile;
+  return { id, name, description, version, author, homepage, protocol, fields, builtin, ...(portalDiscovery ? { portalDiscovery } : {}) };
 }
 function profileParameters(profile, input = {}) {
   object(input, '连接参数');
@@ -140,7 +180,34 @@ const builtinProfile = validateProfile({
   description: '内置 Dr.COM 校园网认证 · 请先连接校园 Wi-Fi 或有线网络',
   version: '1.0.0', author: 'NingMeng123', homepage: 'http://10.151.253.10/',
   protocol: 'drcom', timeoutMs: 10000,
+  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
   fields: [{ key: 'operator', label: '网络类型', default: '1', options: [{ label: '校园网', value: '1' }] }],
 }, { builtin: true });
 
-module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, builtinProfile, validateProfile, parseProfile, publicProfile, profileParameters, safeUrl, keys };
+const builtinRuijieProfile = validateProfile({
+  schemaVersion: 1,
+  id: 'builtin-scu-ruijie',
+  name: '四川大学 · 锐捷 ePortal',
+  description: '参考四川大学锐捷 ePortal 认证流程；请先连接对应校园网络，并选择账号开通的服务。其他学校请导入匹配的锐捷方案。',
+  version: '1.0.0', author: 'NingMeng123', homepage: 'http://192.168.2.135/',
+  protocol: 'ruijie', timeoutMs: 10000,
+  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
+  fields: [{ key: 'service', label: '网络服务', default: 'internet', options: [
+    { label: '校园网（internet）', value: 'internet' },
+    { label: '电信出口', value: '电信出口' },
+    { label: '移动出口', value: '移动出口' },
+    { label: '联通出口', value: '联通出口' },
+  ] }],
+  ruijie: {
+    discoveryUrl: 'http://192.168.2.135/',
+    redirectOrigins: ['http://123.123.123.123'],
+    publicKey: {
+      modulus: '94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871',
+      exponent: '10001',
+    },
+    serviceEncoding: 'percent',
+  },
+}, { builtin: true });
+const builtinProfiles = [builtinProfile, builtinRuijieProfile];
+
+module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, profileParameters, safeUrl, keys };

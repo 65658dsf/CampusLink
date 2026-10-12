@@ -5,7 +5,10 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { request, parseJsonOrJsonp, CampusError } = require('../electron/transport.cjs');
 const { runOperation, drcomPageStatus } = require('../electron/adapters.cjs');
-const { builtinProfile } = require('../electron/profiles.cjs');
+const { builtinProfile: builtinDrcomProfile } = require('../electron/profiles.cjs');
+// Keep legacy Dr.COM protocol fixtures fixed to their mocked authentication host.
+const builtinProfile = structuredClone(builtinDrcomProfile);
+delete builtinProfile.portalDiscovery;
 
 const page = marker => `<!DOCTYPE html><html><head><!--Dr.COMWebLoginID_${marker}.htm-->
   <script>authsuccess='Dr.COMWebLoginID_3.htm';authfail='Dr.COMWebLoginID_2.htm';</script>

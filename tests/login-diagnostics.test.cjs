@@ -7,7 +7,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { runOperation } = require('../electron/adapters.cjs');
-const { builtinProfile } = require('../electron/profiles.cjs');
+const { builtinProfile: builtinDrcomProfile } = require('../electron/profiles.cjs');
+// Keep legacy Dr.COM protocol fixtures fixed to their mocked authentication host.
+const builtinProfile = structuredClone(builtinDrcomProfile);
+delete builtinProfile.portalDiscovery;
 const { CampusService } = require('../electron/service.cjs');
 
 test('Dr.COM login preserves the successful browser capture order and duplicate language fields', async () => {

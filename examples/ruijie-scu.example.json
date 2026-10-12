@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "scu-ruijie",
+  "name": "四川大学 · 锐捷 ePortal",
+  "description": "参考四川大学锐捷 ePortal 认证流程；请先连接对应校园网络，并选择账号开通的服务。其他学校请导入匹配的锐捷方案。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "http://192.168.2.135/",
+  "protocol": "ruijie",
+  "timeoutMs": 10000,
+  "fields": [
+    {
+      "key": "service",
+      "label": "网络服务",
+      "default": "internet",
+      "options": [
+        {
+          "label": "校园网（internet）",
+          "value": "internet"
+        },
+        {
+          "label": "电信出口",
+          "value": "电信出口"
+        },
+        {
+          "label": "移动出口",
+          "value": "移动出口"
+        },
+        {
+          "label": "联通出口",
+          "value": "联通出口"
+        }
+      ]
+    }
+  ],
+  "ruijie": {
+    "discoveryUrl": "http://192.168.2.135/",
+    "redirectOrigins": [
+      "http://123.123.123.123"
+    ],
+    "publicKey": {
+      "modulus": "94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871",
+      "exponent": "10001"
+    },
+    "serviceEncoding": "percent"
+  },
+  "portalDiscovery": {
+    "url": "http://www.msftconnecttest.com/redirect"
+  }
+}

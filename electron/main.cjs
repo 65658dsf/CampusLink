@@ -59,25 +59,32 @@ function registerIpc() {
     if (fs.statSync(file).size > MAX_PROFILE_BYTES) throw new Error('连接方案文件不能超过 64 KB。');
     const text = fs.readFileSync(file, 'utf8');
     const profile = parseProfile(text);
-    const endpoints = Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n');
+    const discovery = profile.portalDiscovery
+      ? `自动发现入口：${profile.portalDiscovery.url}\n应用将探测当前网络的真实认证服务器，并仅向识别出且协议匹配的认证服务器提交账号和密码。\n备用认证页：${profile.homepage}\n\n`
+      : '';
+    const endpoints = profile.protocol === 'ruijie'
+      ? `${profile.portalDiscovery ? '备用网关' : '锐捷'}发现入口：${profile.ruijie.discoveryUrl}\n${profile.portalDiscovery ? '备用网关允许的' : '允许的'}只读发现跳转来源：\n${[new URL(profile.homepage).origin, ...profile.ruijie.redirectOrigins].join('\n')}\n${profile.portalDiscovery ? '备用' : ''}认证接口：${new URL('/eportal/InterFace.do', profile.homepage).href}\n${profile.portalDiscovery ? '' : '账号和加密后的密码只提交到上述认证接口。\n'}服务名称编码：${profile.ruijie.serviceEncoding === 'percent' ? '百分号编码' : '原始文本'}`
+      : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`;
     const confirmation = await dialog.showMessageBox(win, {
       type: 'question', title: '确认导入连接方案', message: `导入「${profile.name}」？`,
-      detail: `作者：${profile.author || '未填写'}\n版本：${profile.version}\n认证页：${profile.homepage}\n\n请求地址（均与认证页同源）：\n${endpoints}\n\n连接时，账号和密码会发送给此方案指定的认证服务器。请确认你信任该方案及其地址。`,
+      detail: `作者：${profile.author || '未填写'}\n版本：${profile.version}\n${profile.portalDiscovery ? '' : `认证页：${profile.homepage}\n\n`}${discovery}${endpoints}\n\n${profile.portalDiscovery ? '自动发现以当前校园网络的认证跳转为依据，请确认连接的是你信任的校园网络。' : '连接时，账号和密码会发送给此方案指定的认证服务器。请确认你信任该方案及其地址。'}`,
       buttons: ['取消', '信任并导入'], defaultId: 0, cancelId: 0, noLink: true,
     });
     if (confirmation.response !== 1) return { canceled: true, snapshot: service.snapshot() };
     return { canceled: false, snapshot: service.importProfile(text) };
   });
-  handle('exportExample', async () => {
-    const result = await dialog.showSaveDialog(win, { title: '保存连接方案示例', defaultPath: 'custom-campus.example.json', filters: [{ name: '连接方案 JSON', extensions: ['json'] }] });
+  handle('exportExample', async (kind = 'http') => {
+    if (!['http', 'ruijie'].includes(kind)) throw new Error('方案示例类型无效。');
+    const filename = kind === 'ruijie' ? 'ruijie-campus.example.json' : 'custom-campus.example.json';
+    const result = await dialog.showSaveDialog(win, { title: kind === 'ruijie' ? '保存锐捷连接方案示例' : '保存 HTTP 连接方案示例', defaultPath: filename, filters: [{ name: '连接方案 JSON', extensions: ['json'] }] });
     if (result.canceled || !result.filePath) return { canceled: true };
-    fs.copyFileSync(path.join(__dirname, '../examples/custom-campus.example.json'), result.filePath);
+    fs.copyFileSync(path.join(__dirname, '../examples', filename), result.filePath);
     service.log('success', '连接方案示例已保存。');
     return { canceled: false, path: result.filePath };
   });
   handle('openPortal', async id => {
     const profile = service.profile(id);
-    const url = safeUrl(profile.homepage);
+    const url = safeUrl(profile.portalDiscovery?.url ?? profile.homepage);
     await shell.openExternal(url.href);
   });
   handle('windowAction', action => {

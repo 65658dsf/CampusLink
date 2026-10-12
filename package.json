@@ -1,6 +1,6 @@
 {
   "name": "campus-link",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "description": "岚连 · 可扩展的 Windows / macOS 校园网连接工具",

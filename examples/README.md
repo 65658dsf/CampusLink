@@ -1,16 +1,26 @@
 # 外部校园网连接方案
 
-`custom-campus.example.json` 是可直接导入的结构示例，使用保留域名 `campus.example.invalid`，不会向真实学校提交账号。请复制后将认证地址、请求字段和响应规则改为学校公布或认证页实际使用的协议，再在岚连的「连接方案」中导入。
+| 示例 | 用途 |
+| --- | --- |
+| [custom-campus.example.json](custom-campus.example.json) | 固定 HTTP 接口；使用 `.invalid` 占位域名，需替换认证地址、请求字段和响应规则 |
+| [ruijie-campus.example.json](ruijie-campus.example.json) | 制作其他学校的锐捷 ePortal Web 方案；地址、跳转源、公钥、服务名称均需确认和替换 |
+| [ruijie-scu.example.json](ruijie-scu.example.json) | 四川大学锐捷参考配置，与内置方案使用相同协议参数，但使用可导入的外部 ID |
+
+前两项是结构示例，不能直接用于真实校园网认证。川大参考配置也未在四川大学真实网络验证；不要将其地址或密钥直接套用到其他学校。锐捷方案详细制作、抓包和编码说明见 [锐捷教程](../docs/ruijie-guide.md)。
 
 本应用只读取声明式 JSON，不运行插件 JavaScript。文件上限 64 KB，最多导入 30 个方案。方案 ID 必须唯一，外部方案不能使用 `builtin-` 前缀。应用会校验全部字段，拒绝未知字段和模板变量。
 
 ## 基础结构
 
-`schemaVersion` 固定为 `1`。必填字段为 `id`、`name`、`version`、`homepage`、`protocol` 和 `operations`。外部方案的 `protocol` 为 `http`；`description`、`author`、`fields`、`timeoutMs` 可选。`timeoutMs` 默认 10000，范围为 1000 至 30000。
+`schemaVersion` 固定为 `1`。共有必填字段为 `id`、`name`、`version`、`homepage`、`protocol`。`description`、`author`、`timeoutMs` 可选。`timeoutMs` 默认 10000，范围为 1000 至 30000。
 
-`homepage` 是用户点击「打开认证页」访问的网址。每个请求端点必须和它使用同一协议、主机及端口；重定向不会被自动跟随。支持局域网 HTTP 和 HTTPS。校方只提供 HTTP 时，认证流量无法由本工具自动变成 HTTPS。
+`http` 必须配置 `operations`，`fields` 可选。`ruijie` 必须配置 `ruijie` 及含 `service` 的 `fields`，不得设置 `operations`；`service` 须有非空默认值或非空选项。外部方案不能声明 `drcom`。
 
-## 请求与判断
+`homepage` 保存已知认证入口。HTTP 方案每个请求端点必须和它使用同一协议、主机及端口，且不跟随重定向。锐捷方案可优先从网络探测识别真实认证来源，未识别时回退 `homepage` / `ruijie.discoveryUrl`；认证只发送到识别出的 ePortal 或已知回退服务器。支持局域网 HTTP 和 HTTPS。校方只提供 HTTP 时，认证流量无法由本工具自动变成 HTTPS。
+
+顶层可选 `portalDiscovery` 仅供 `drcom` / `ruijie` 使用：`{ "url": "http://www.msftconnecttest.com/redirect" }`。两种内置方案与锐捷示例默认带有该配置；通用 HTTP 示例不使用。应用通过只读 GET 识别门户，不向探测地址或正常 MSN/Bing 跳转提交账号密码，也不把普通互联网页面当成已登录。发现缓存只复用运行期间的真实服务器来源，不持久保存临时查询串、MAC 或设备参数。
+
+## HTTP 请求与判断
 
 `operations.login`、`logout` 和 `status` 均必填，保证方案包含完整的登录、注销和只读状态查询能力。缺少操作的文件无法导入。
 
@@ -28,6 +38,14 @@
 `fields` 最多 12 项，每项包含唯一 `key` 和 `label`，可选 `default`、`placeholder`、`options`。有 `options` 时渲染选择器，每个选项由 `label` 和 `value` 组成。没有选项时渲染输入框。密码由应用独立管理，禁止声明 `username` 或 `password` 字段。
 
 仅导入你理解并信任的方案：认证操作会把你填写的账号、密码发送给方案指定的认证服务器。
+
+## 锐捷 ePortal Web 方案
+
+应用的「导出锐捷示例」导出 [ruijie-campus.example.json](ruijie-campus.example.json)。保留顶层 `portalDiscovery` 可优先发现当前网络的真实认证地址，同时按学校网页填写已知回退入口 `homepage` / `ruijie.discoveryUrl`、`redirectOrigins`、`publicKey`、`serviceEncoding` 与 `fields` 的 `service` 值，然后导入；不需要手工填写当前客户端的 IP、MAC 或 `queryString`。
+
+`discoveryUrl` 与 `homepage` 同源，省略时使用 `homepage`；`redirectOrigins` 仅填写其他允许发现的来源，如 `http://123.123.123.123`，不能带尾部斜杠、路径或参数。公钥是十六进制模数与指数。服务值使用网页原始文本，川大示例的 `percent` 模式会先对中文服务值进行百分号编码，再进行表单编码。其他学校是否使用该模式须检查真实请求。
+
+内置四川大学方案可直接在学校列表中选择，无须重复导入。已有贵州轻工职业大学 Dr.COM 默认方案保持独立。当前锐捷适配范围是网页 ePortal，不包括 802.1X、二维码/短信登录或自动处理验证码。请按 [详细教程](../docs/ruijie-guide.md) 验证对应部署，不要把本机模拟测试当成校园网实测。
 
 ## 贵州轻工职业大学内置方案
 
