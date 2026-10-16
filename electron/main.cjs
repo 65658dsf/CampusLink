@@ -52,6 +52,7 @@ function registerIpc() {
     const snapshot = service.saveSettings(patch);
     return previousProfile !== service.settings.profileId ? service.checkStatus() : snapshot;
   });
+  handle('saveCredentials', input => service.setCredentials(input));
   handle('connect', input => service.connect(input));
   handle('disconnect', () => service.disconnect());
   handle('checkStatus', () => service.checkStatus());
@@ -226,16 +227,17 @@ else {
   app.whenReady().then(() => {
     // 产品改名后 userData 目录会变化：首次启动时把旧目录的 settings.json 迁移过来，
     // 保留账号、方案与偏好；旧目录保留不删，便于回滚。
+    const settingsFile = path.join(app.getPath('userData'), 'settings.json');
+    const freshInstall = !fs.existsSync(settingsFile);
     try {
-      const settingsFile = path.join(app.getPath('userData'), 'settings.json');
       const legacyFile = path.join(app.getPath('appData'), '岚连 · Campus Link', 'settings.json');
-      if (!fs.existsSync(settingsFile) && fs.existsSync(legacyFile)) {
+      if (freshInstall && fs.existsSync(legacyFile)) {
         fs.mkdirSync(app.getPath('userData'), { recursive: true });
         fs.copyFileSync(legacyFile, settingsFile);
       }
     } catch { /* 迁移失败不阻止启动；应用会以默认设置运行 */ }
     service = new CampusService({
-      directory: app.getPath('userData'), safeStorage, version: app.getVersion(), packaged: app.isPackaged,
+      directory: app.getPath('userData'), safeStorage, version: app.getVersion(), packaged: app.isPackaged, firstRun: freshInstall,
       autoLaunch: enabled => {
         if (!['win32', 'darwin'].includes(process.platform)) throw new Error('开机自启动支持 Windows 和 macOS。');
         if (!app.isPackaged) throw new Error('开发预览不注册开机自启动，请安装正式版后设置。');

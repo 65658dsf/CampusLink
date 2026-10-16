@@ -102,3 +102,5 @@
 .journal-entry-head strong{font-size:12px;color:#2f4a3c}
 .journal-date{margin-left:auto;font-size:10px;color:#8fa294}
 .journal-entry ul{margin:8px 0 0;padding-left:16px;font-size:11px;line-height:1.9;color:#5c7a68}
+/* 标题栏吸顶：滚动时保持在窗口顶部，拖拽区不随内容滚走。 */
+.titlebar{position:sticky;top:0;z-index:5}

@@ -12,10 +12,11 @@ const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPa
 const IDLE = () => ({ status: 'idle', message: '准备就绪，连接校园网络后即可认证。' });
 
 class CampusService extends EventEmitter {
-  constructor({ directory, safeStorage, version = '1.0.0', platform = process.platform, packaged = false, autoLaunch = () => false, operation = runOperation, now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout }) {
+  constructor({ directory, safeStorage, version = '1.0.0', platform = process.platform, packaged = false, autoLaunch = () => false, operation = runOperation, now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout, firstRun }) {
     super();
     this.directory = directory;
     this.file = path.join(directory, 'settings.json');
+    this.firstRun = firstRun ?? !fs.existsSync(this.file);
     this.safeStorage = safeStorage;
     this.autoLaunch = autoLaunch;
     this.operation = operation;
@@ -40,7 +41,7 @@ class CampusService extends EventEmitter {
     this.refreshing = false;
     this.connection = IDLE();
     this.logs = [];
-    this.appInfo = { version, platform, packaged, secureStorage: this.storageAvailable() };
+    this.appInfo = { version, platform, packaged, firstRun: this.firstRun, secureStorage: this.storageAvailable() };
     this.load();
     this.log('info', '岚连 · CDUTYB 专版已就绪，首次连接按启动偏好执行；确认在线后可按设置检测并自动重连。', false);
   }
@@ -136,7 +137,7 @@ class CampusService extends EventEmitter {
       if (new Set(this.externalProfiles.map(p => p.id)).size !== this.externalProfiles.length) throw new Error('duplicate');
       this.settings = this.validatedSettings({ ...defaults(), ...saved.settings });
       const cred = saved.credential;
-      if (this.settings.rememberPassword && cred && cred.profileId === this.settings.profileId && cred.username === this.settings.username && typeof cred.encrypted === 'string' && cred.encrypted.length < 20000) this.credential = cred;
+      if (this.settings.rememberPassword && cred && cred.profileId === this.settings.profileId && cred.username === this.settings.username && ((typeof cred.password === 'string' && cred.password.length > 0 && cred.password.length <= 1024) || (typeof cred.encrypted === 'string' && cred.encrypted.length < 20000))) this.credential = cred;
       if (!this.credential) this.settings.autoConnect = false;
       if (!this.appInfo.packaged) this.settings.autoLaunch = false;
     } catch {
@@ -157,7 +158,7 @@ class CampusService extends EventEmitter {
     if (publish) this.publish();
   }
   snapshot() {
-    return structuredClone({ settings: this.settings, hasPassword: Boolean(this.credential && this.storageAvailable()), profiles: [...builtinProfiles.map(p => publicProfile(p, true)), ...this.externalProfiles.map(p => publicProfile(p))], connection: { ...this.connection, refreshing: this.refreshing, canDisconnect: Boolean(this.session || this.connection.status === 'connected'), monitoring: this.monitoring(), reconnectPaused: this.reconnectPaused }, logs: this.logs, app: { ...this.appInfo, secureStorage: this.storageAvailable() } });
+    return structuredClone({ settings: this.settings, hasPassword: Boolean(this.credential), profiles: [...builtinProfiles.map(p => publicProfile(p, true)), ...this.externalProfiles.map(p => publicProfile(p))], connection: { ...this.connection, refreshing: this.refreshing, canDisconnect: Boolean(this.session || this.connection.status === 'connected'), monitoring: this.monitoring(), reconnectPaused: this.reconnectPaused }, logs: this.logs, app: { ...this.appInfo, secureStorage: this.storageAvailable() } });
   }
   publish() { const value = this.snapshot(); this.emit('snapshot', value); return value; }
   assertIdle() { if (this.busy) throw new Error('正在处理网络请求，请稍候。'); }
@@ -179,11 +180,10 @@ class CampusService extends EventEmitter {
     const next = this.validatedSettings({ ...this.settings, ...patch, parameters: changedProfile ? (patch.parameters || {}) : (patch.parameters || this.settings.parameters) });
     const changedIdentity = next.profileId !== this.settings.profileId || next.username !== this.settings.username;
     if (changedIdentity && (this.session || this.connection.status === 'connected')) throw new Error('请先断开当前认证，再更改账号或连接方案。');
-    if (next.rememberPassword && !this.storageAvailable()) throw new Error('系统安全存储不可用，无法记住密码。');
     const credential = !next.rememberPassword || changedIdentity ? null : this.credential;
-    if (patch.autoConnect === true && (!next.rememberPassword || !credential || !this.storageAvailable() || !this.decryptPassword())) throw new Error('请先勾选记住密码并成功保存账号，再启用自动连接。');
+    if (patch.autoConnect === true && (!next.rememberPassword || !credential || !this.decryptPassword())) throw new Error('请先在「应用设置 → 密码管理」保存账号密码，再启用自动连接。');
     if (!next.rememberPassword || changedIdentity) next.autoConnect = false;
-    if (next.autoConnect && !credential) throw new Error('请先勾选记住密码并成功保存账号，再启用自动连接。');
+    if (next.autoConnect && !credential) throw new Error('请先在「应用设置 → 密码管理」保存账号密码，再启用自动连接。');
     if (next.autoConnect && this.profile(next.profileId).protocol === 'http' && !this.profile(next.profileId).operations.status) throw new Error('启用自动连接需要方案提供只读状态查询。');
     if (next.autoLaunch !== this.settings.autoLaunch) next.autoLaunch = this.autoLaunch(next.autoLaunch);
     this.credential = credential;
@@ -200,10 +200,29 @@ class CampusService extends EventEmitter {
     this.persist();
     return this.publish();
   }
+  setCredentials(input) {
+    // 明文账号密码管理：不受连接忙碌限制；连接中仅允许改密码，改账号需先断开。
+    keys(input, ['username', 'password'], '账号密码');
+    const username = typeof input.username === 'string' ? input.username.trim() : '';
+    if (!username || username.length > 200 || /[\r\n\u0000]/.test(username)) throw new Error('账号格式无效。');
+    if (typeof input.password !== 'string' || !input.password || input.password.length > 1024 || /[\r\n\u0000]/.test(input.password)) throw new Error('密码格式无效。');
+    const changedIdentity = username !== this.settings.username;
+    if (changedIdentity && (this.session || this.connection.status === 'connected')) throw new Error('请先断开当前认证，再更改账号。');
+    this.credential = { profileId: this.settings.profileId, username, password: input.password };
+    this.settings = { ...this.settings, username, rememberPassword: true, ...(changedIdentity ? { autoConnect: false } : {}) };
+    if (changedIdentity) { this.stopMonitoring(); this.reconnectContext = null; this.reconnectWarning = false; }
+    this.persist();
+    return this.publish();
+  }
   decryptPassword() {
-    if (!this.credential || !this.storageAvailable()) return '';
-    try { return this.safeStorage.decryptString(Buffer.from(this.credential.encrypted, 'base64')); }
-    catch { throw new Error('已保存的密码无法解密，请重新输入并保存。'); }
+    // 明文直读；旧版加密凭据仅作只读兜底，解密失败视为未保存。
+    if (!this.credential) return '';
+    if (typeof this.credential.password === 'string') return this.credential.password;
+    if (typeof this.credential.encrypted === 'string' && this.storageAvailable()) {
+      try { return this.safeStorage.decryptString(Buffer.from(this.credential.encrypted, 'base64')); }
+      catch { return ''; }
+    }
+    return '';
   }
   async connect(input, { automatic = false } = {}) {
     if (this.disposed) throw new Error('应用已停止，无法继续连接。');
@@ -218,11 +237,8 @@ class CampusService extends EventEmitter {
     if (!password) throw new Error('请输入校园网密码。');
     let credential = automatic ? this.credential : null;
     if (automatic && (!sameIdentity || JSON.stringify(next.parameters) !== JSON.stringify(this.settings.parameters))) throw new Error('认证身份已变化，请手动连接。');
-    if (!automatic && next.rememberPassword) {
-      if (!this.storageAvailable()) throw new Error('系统安全存储不可用，取消记住密码后可继续连接。');
-      try { credential = { profileId: next.profileId, username: next.username, encrypted: this.safeStorage.encryptString(password).toString('base64') }; }
-      catch { throw new Error('密码加密失败，取消记住密码后可继续连接。'); }
-    } else if (!next.rememberPassword) next.autoConnect = false;
+    if (!automatic && next.rememberPassword) credential = { profileId: next.profileId, username: next.username, password };
+    else if (!next.rememberPassword) next.autoConnect = false;
     if (!sameIdentity || JSON.stringify(next.parameters) !== JSON.stringify(this.settings.parameters)) { this.stopMonitoring(); this.reconnectContext = null; this.reconnectWarning = false; }
     this.credential = credential;
     this.settings = next;

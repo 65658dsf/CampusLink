@@ -39,6 +39,28 @@ const http = require('node:http');
     settings: { profileId: startupProfile.id, username: '', parameters: { operator: 'campus' }, rememberPassword: false, autoLaunch: false, autoConnect: false, minimizeToTray: true },
     profiles: [startupProfile], credential: null,
   }));
+  // 首次启动引导：空数据目录 → 欢迎弹窗 → 保存账号密码与检测间隔。
+  const welcomeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'campus-link-welcome-'));
+  const welcomeEnv = { ...process.env, CAMPUS_LINK_DATA_DIR: welcomeDirectory };
+  delete welcomeEnv.ELECTRON_RUN_AS_NODE;
+  delete welcomeEnv.VITE_DEV_SERVER_URL;
+  const welcomeApp = await electron.launch({ args: [root], cwd: root, env: welcomeEnv });
+  try {
+    const welcomePage = await welcomeApp.firstWindow();
+    const welcomeDialog = welcomePage.getByRole('dialog', { name: '欢迎使用 · 岚连' });
+    await expect(welcomeDialog).toBeVisible();
+    assert.equal((await welcomePage.evaluate(() => window.campus.getSnapshot())).app.firstRun, true);
+    await welcomeDialog.getByLabel('校园网账号', { exact: true }).fill('welcome-account');
+    await welcomeDialog.getByLabel('登录密码', { exact: true }).fill('welcome-secret');
+    await welcomeDialog.getByLabel('断连检测间隔（秒）', { exact: true }).fill('10');
+    await welcomePage.screenshot({ path: path.join(root, 'artifacts/welcome-firstrun.png') });
+    await welcomePage.getByRole('button', { name: '保存并开始', exact: true }).click();
+    await expect(welcomeDialog).not.toBeVisible();
+    const welcomeSaved = JSON.parse(fs.readFileSync(path.join(welcomeDirectory, 'settings.json'), 'utf8'));
+    assert.equal(welcomeSaved.settings.username, 'welcome-account');
+    assert.equal(welcomeSaved.settings.reconnectIntervalSeconds, 10);
+    assert.equal(welcomeSaved.credential.password, 'welcome-secret');
+  } finally { await welcomeApp.close().catch(() => {}); }
   const env = { ...process.env, CAMPUS_LINK_DATA_DIR: dataDirectory };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.VITE_DEV_SERVER_URL;
@@ -48,6 +70,7 @@ const http = require('node:http');
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await expect(page.getByRole('heading', { name: '校园生活，即刻在线.' })).toBeVisible();
+    assert.equal(await page.getByRole('dialog', { name: '欢迎使用 · 岚连' }).count(), 0, '已有配置不会出现首启引导');
     const security = await page.evaluate(() => ({ hasBridge: Boolean(window.campus), nodeAccess: typeof window.require }));
     assert.equal(security.hasBridge, true);
     assert.equal(security.nodeAccess, 'undefined');
@@ -83,7 +106,7 @@ const http = require('node:http');
     await page.getByRole('button', { name: '关闭提示' }).click();
     await page.getByRole('button', { name: '开发日志', exact: true }).click();
     await expect(page.getByRole('heading', { name: '版本记录' })).toBeVisible();
-    await expect(page.locator('.journal-entry').first()).toContainText('v1.3.0');
+    await expect(page.locator('.journal-entry').first()).toContainText('v1.4.0');
     await expect(page.getByText('PowerT-0704').first()).toBeVisible();
     await page.getByRole('button', { name: '复制反馈邮箱' }).click();
     await expect(page.getByRole('alert')).toContainText('反馈邮箱已复制');
@@ -138,9 +161,11 @@ const http = require('node:http');
     rejectLogin = false;
     await page.getByRole('button', { name: '连接校园网', exact: true }).click();
     await expect(page.getByRole('button', { name: '注销校园网', exact: true })).toBeVisible();
+    await expect(page.locator('.session-details')).toContainText('当前账号');
+    await expect(page.locator('.session-details')).toContainText('local-smoke-account');
     assert.equal(online, true);
     assert.equal(new URLSearchParams(requests.find(item => item.path === '/api/login').body).get('password'), 'local-smoke-secret');
-    assert.equal(fs.readFileSync(path.join(dataDirectory, 'settings.json'), 'utf8').includes('local-smoke-secret'), false);
+    assert.equal(fs.readFileSync(path.join(dataDirectory, 'settings.json'), 'utf8').includes('local-smoke-secret'), true, '密码按明文策略写入本机设置文件');
     await page.getByRole('switch', { name: '启动后自动连接', exact: true }).click();
     await expect(page.getByRole('switch', { name: '启动后自动连接', exact: true })).toBeChecked();
     await page.getByRole('button', { name: '应用设置', exact: true }).click();
@@ -174,6 +199,19 @@ const http = require('node:http');
     assert.equal(JSON.stringify(diagnostics).includes('local-smoke-account'), false);
     assert.ok(diagnostics.settings.username.startsWith('lo'));
     if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
+    // 密码管理（明文）：直接设置账号密码 → 主界面显示当前账号 → 再清除。
+    await page.getByRole('button', { name: '管理账号密码', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: '管理账号与密码' })).toBeVisible();
+    await page.getByLabel('校园网账号', { exact: true }).fill('managed-account');
+    await page.getByLabel('登录密码', { exact: true }).fill('managed-secret');
+    await page.screenshot({ path: path.join(root, 'artifacts/password-manager.png') });
+    await page.getByRole('button', { name: '保存账号密码', exact: true }).click();
+    await expect.poll(async () => (await page.evaluate(() => window.campus.getSnapshot())).settings.username).toBe('managed-account');
+    assert.equal((await page.evaluate(() => window.campus.getSnapshot())).hasPassword, true);
+    assert.equal(fs.readFileSync(path.join(dataDirectory, 'settings.json'), 'utf8').includes('managed-secret'), true);
+    await page.getByRole('button', { name: '连接概览', exact: true }).click();
+    await expect(page.getByLabel('校园网账号', { exact: true })).toHaveValue('managed-account');
+    await page.getByRole('button', { name: '应用设置', exact: true }).click();
     await page.getByRole('button', { name: '清除密码', exact: true }).click();
     await expect(page.getByRole('switch', { name: '启动后自动连接', exact: true })).not.toBeChecked();
     await expect(page.getByRole('button', { name: '清除密码', exact: true })).toBeDisabled();
@@ -186,13 +224,20 @@ const http = require('node:http');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 720));
     await page.screenshot({ path: path.join(root, 'artifacts/desktop-compact.png'), fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'No horizontal overflow at minimum window size');
+    // 标题栏吸顶：滚动后仍固定在窗口顶部（可随时拖动窗口）。
+    await page.evaluate(() => window.scrollTo(0, 500));
+    const titlebarBox = await page.locator('.titlebar').boundingBox();
+    assert.ok(titlebarBox && titlebarBox.y >= 0 && titlebarBox.y < 2, 'Titlebar stays pinned while scrolling');
+    await page.screenshot({ path: path.join(root, 'artifacts/titlebar-sticky.png') });
+    await page.evaluate(() => window.scrollTo(0, 0));
     assert.deepEqual(errors, []);
     // Closing with the tray preference disabled must actually quit, without changing network state.
     await page.getByRole('button', { name: '应用设置', exact: true }).click();
     await page.getByRole('switch', { name: '关闭时最小化到托盘', exact: true }).click();
     const closed = app.waitForEvent('close');
-    await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
+    // 点击关闭后窗口会立即退出，Playwright 可能在该点击结算前收到上下文关闭，属预期行为。
+    await page.getByRole('button', { name: '关闭窗口', exact: true }).click().catch(() => {});
     await closed;
-    console.log('Desktop smoke passed: renderer bridge, navigation, validation, startup guards, profile import/export/removal, local mock authentication, configurable outage reconnection, manual logout pause, response details and redaction, native clipboard, actual Windows credential encryption, responsive layout, and exit.');
+    console.log('Desktop smoke passed: renderer bridge, navigation, validation, startup guards, profile import/export/removal, local mock authentication, configurable outage reconnection, manual logout pause, response details and redaction, native clipboard, plaintext credential policy with password manager, sticky titlebar, responsive layout, and exit.');
   } finally { await app.close().catch(() => {}); await new Promise(resolve => server.close(resolve)); }
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => { console.error(error); process.exit(1); });

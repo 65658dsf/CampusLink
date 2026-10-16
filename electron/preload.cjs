@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('campus', Object.freeze({
   getSnapshot: invoke('getSnapshot'),
   copyText: invoke('copyText'),
   saveSettings: invoke('saveSettings'),
+  saveCredentials: invoke('saveCredentials'),
   connect: invoke('connect'),
   disconnect: invoke('disconnect'),
   checkStatus: invoke('checkStatus'),

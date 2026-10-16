@@ -4,12 +4,13 @@ export interface Profile { id: string; name: string; description: string; versio
 export interface Settings { profileId: string; username: string; rememberPassword: boolean; autoLaunch: boolean; autoConnect: boolean; autoReconnect: boolean; reconnectIntervalSeconds: number; minimizeToTray: boolean; parameters: Record<string, string> }
 export interface RequestDiagnostic { method: string; url: string; status?: number; statusText?: string; contentType?: string; durationMs: number; responseBody: string; truncated: boolean }
 export interface LogEntry { id: string; time: string; level: 'info' | 'success' | 'warning' | 'error'; message: string; details?: { code: string; requests: RequestDiagnostic[] } }
-export interface Snapshot { settings: Settings; hasPassword: boolean; profiles: Profile[]; connection: { status: ConnectionState; message: string; monitoring: boolean; reconnectPaused?: boolean; portalUrl?: string; ip?: string; since?: string; checkedAt?: string; refreshing?: boolean; canDisconnect?: boolean }; logs: LogEntry[]; app: { version: string; platform: string; packaged: boolean; secureStorage: boolean } }
+export interface Snapshot { settings: Settings; hasPassword: boolean; profiles: Profile[]; connection: { status: ConnectionState; message: string; monitoring: boolean; reconnectPaused?: boolean; portalUrl?: string; ip?: string; since?: string; checkedAt?: string; refreshing?: boolean; canDisconnect?: boolean }; logs: LogEntry[]; app: { version: string; platform: string; packaged: boolean; firstRun: boolean; secureStorage: boolean } }
 export interface ConnectInput { profileId: string; username: string; password: string; rememberPassword: boolean; parameters: Record<string, string> }
 export interface CampusAPI {
   copyText(text: string): Promise<void>;
   getSnapshot(): Promise<Snapshot>;
   saveSettings(patch: Partial<Settings>): Promise<Snapshot>;
+  saveCredentials(input: { username: string; password: string }): Promise<Snapshot>;
   connect(input: ConnectInput): Promise<Snapshot>;
   disconnect(): Promise<Snapshot>;
   checkStatus(): Promise<Snapshot>;
