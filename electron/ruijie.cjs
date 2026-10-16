@@ -9,14 +9,14 @@ const MAX_HOPS = 6;
 const MAX_QUERY = 16384;
 const PATHS = { login: '/eportal/index.jsp', online: '/eportal/success.jsp', api: '/eportal/InterFace.do' };
 
-function encryptPassword(password, mac, publicKey) {
+function rsaEncrypt(value, publicKey) {
   const exponent = BigInt(`0x${publicKey.exponent}`);
   const modulus = BigInt(`0x${publicKey.modulus}`);
   const bits = modulus.toString(2).length;
   if (bits < 512 || bits > 4096 || !(modulus & 1n) || exponent < 3n || exponent > 0xffffffffn || !(exponent & 1n)) throw new CampusError('锐捷 RSA 公钥配置无效。', 'INVALID_PROFILE');
   // This legacy browser protocol packs UTF-16 code units into little-endian
   // words. Reversing code units is intentional; UTF-8/OAEP would not match it.
-  const input = `${password}>${mac}`.split('').reverse().map(character => character.charCodeAt(0));
+  const input = String(value).split('').reverse().map(character => character.charCodeAt(0));
   const chunkSize = 2 * Math.ceil(bits / 16);
   while (input.length % chunkSize) input.push(0);
   const parts = [];
@@ -34,6 +34,12 @@ function encryptPassword(password, mac, publicKey) {
   return parts.join(' ');
 }
 
+function encryptPassword(password, mac, publicKey) {
+  // The SCU-style reference packs `password>mac`; some deployments (for
+  // example CDUT-Yibin) encrypt the reversed password alone via rsaEncrypt.
+  return rsaEncrypt(`${password}>${mac}`, publicKey);
+}
+
 function allowedUrl(value, base, profile) {
   let url;
   try { url = new URL(value, base); } catch { throw new CampusError('锐捷认证页返回了无效跳转地址。', 'PORTAL_REDIRECT'); }
@@ -42,10 +48,12 @@ function allowedUrl(value, base, profile) {
   return url;
 }
 
-function queryContext(url) {
+function queryContext(url, requireMac = true) {
   const queryString = url.search.slice(1);
-  const mac = url.searchParams.get('mac');
-  if (!queryString || queryString.length > MAX_QUERY || !mac || mac.length > 256 || /[\s\u0000-\u001f]/.test(mac)) throw new CampusError('锐捷认证页缺少有效的设备参数，请连接校园网络后打开认证页检查。', 'PORTAL_PARAMETERS');
+  const mac = url.searchParams.get('mac') || '';
+  // Profiles that encrypt the reversed password alone do not need the device
+  // identifier, but the query string itself must still be present.
+  if (!queryString || queryString.length > MAX_QUERY || (requireMac && (!mac || mac.length > 256 || /[\s\u0000-\u001f]/.test(mac)))) throw new CampusError('锐捷认证页缺少有效的设备参数，请连接校园网络后打开认证页检查。', 'PORTAL_PARAMETERS');
   return { queryString, mac };
 }
 
@@ -126,7 +134,17 @@ function createPortalSession(profile, requester, onSecret) {
         continue;
       }
       const target = htmlTarget(response.body);
-      if (target) { current = allowedUrl(target, current, profile); continue; }
+      if (target) {
+        const next = allowedUrl(target, current, profile);
+        // Portals ship literal self-navigation inside helper functions (for
+        // example the success page's `window.location="./success.jsp"`).
+        // Keep the current document when the target has the same origin and
+        // path so a page refresh is not mistaken for a redirect loop.
+        if (next.origin !== current.origin || next.pathname !== current.pathname) {
+          current = next;
+          continue;
+        }
+      }
       // An approved discovery host can supply a URL, but only the configured
       // authentication origin's actual success page confirms an online session.
       if (current.origin === new URL(profile.homepage).origin && current.pathname.toLowerCase() === PATHS.online) {
@@ -135,7 +153,7 @@ function createPortalSession(profile, requester, onSecret) {
         return { online: true, userIndex, message: '已通过锐捷校园网认证。' };
       }
       if (current.origin === new URL(profile.homepage).origin && current.pathname.toLowerCase() === PATHS.login) {
-        const context = queryContext(current);
+        const context = queryContext(current, profile.ruijie.passwordWithMac !== false);
         remember(context.queryString); remember(context.mac);
         return { online: false, ...context, message: '当前尚未通过锐捷校园网认证。' };
       }
@@ -175,13 +193,21 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
   let data;
   if (operation === 'login') {
     const service = context.parameters?.service ?? profile.fields?.find(field => field.key === 'service')?.default ?? '';
-    if (!service || !context.username || !context.password) throw new CampusError('请填写校园网账号、密码并选择网络服务。', 'INVALID_PARAMETERS');
-    const password = encryptPassword(context.password, status.mac, profile.ruijie.publicKey);
+    const serviceRequired = profile.ruijie.serviceOptional !== true;
+    if ((serviceRequired && !service) || !context.username || !context.password) throw new CampusError(serviceRequired ? '请填写校园网账号、密码并选择网络服务。' : '请填写校园网账号和密码。', 'INVALID_PARAMETERS');
+    // Deployments differ: SCU packs `password>mac` into the legacy transform,
+    // CDUT-Yibin encrypts the reversed password alone.
+    const password = profile.ruijie.passwordWithMac === false
+      ? rsaEncrypt(context.password, profile.ruijie.publicKey)
+      : encryptPassword(context.password, status.mac, profile.ruijie.publicKey);
     portal.remember(password);
+    // CDUT-Yibin pre-encodes the account and query string once before the
+    // portal form is serialized, so both appear double-encoded on the wire.
+    const encodeValue = value => profile.ruijie.valueEncoding === 'percent' ? encodeURIComponent(value) : value;
     data = await portal.api('login', {
-      userId: context.username, password,
+      userId: encodeValue(context.username), password,
       service: profile.ruijie.serviceEncoding === 'percent' ? encodeURIComponent(service) : service,
-      queryString: status.queryString, operatorPwd: '', operatorUserId: '', validcode: '', passwordEncrypt: 'true',
+      queryString: encodeValue(status.queryString), operatorPwd: '', operatorUserId: '', validcode: '', passwordEncrypt: 'true',
     });
   } else {
     // SCU's own Go implementation uses an empty logout body; deployments which
@@ -196,4 +222,4 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
   return { online: verified.online, message: operation === 'login' ? '锐捷校园网认证成功。' : '已退出锐捷校园网认证。' };
 }
 
-module.exports = { ruijieOperation, encryptPassword, allowedUrl, queryContext, htmlTarget };
+module.exports = { ruijieOperation, encryptPassword, rsaEncrypt, allowedUrl, queryContext, htmlTarget };

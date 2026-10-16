@@ -125,11 +125,16 @@ GET http://192.168.2.135/
 | `ruijie.discoveryUrl` | 可选，与 `homepage` 同源；默认 `homepage`，保持作为已知发现入口，网络发现优先 |
 | `ruijie.redirectOrigins` | 可选，默认 `[]`；最多 8 个无重复、无尾部斜杠的完整来源 |
 | `ruijie.publicKey` | 必填，只包含 `modulus`、`exponent` 两个十六进制字符串 |
-| `ruijie.serviceEncoding` | 可选，`plain` 或 `percent`；默认 `plain` |
-| `fields` | 必须包含 `service` 字段，提供非空默认值或非空选项 |
+| `ruijie.serviceEncoding` | 可选，`plain` 或 `percent`；默认 `plain`，控制服务名称进入表单前是否再编码一次 |
+| `ruijie.passwordWithMac` | 可选布尔值，默认 `true`：RSA 输入为 `密码 + ">" + mac`；设为 `false` 时只加密反转后的密码本身（成都理工大学宜宾校区等部署） |
+| `ruijie.serviceOptional` | 可选布尔值，默认 `false`；设为 `true` 时允许省略 `service` 字段或留空，登录提交空服务名 |
+| `ruijie.valueEncoding` | 可选，`plain` 或 `percent`；默认 `plain`。设为 `percent` 时账号与 `queryString` 会先整体百分号编码再进入表单（抓包表现为双重编码，成都理工大学宜宾校区等部署） |
+| `fields` | 默认必须包含 `service` 字段，提供非空默认值或非空选项；`serviceOptional` 为 `true` 时可省略 |
 | `operations` | 锐捷方案不允许填写；由主程序固定实现登录、注销和状态检查 |
 
 这里只能配置以上能力。添加 `headers`、动态脚本、任意 API 路径或未知属性会被拒绝，不能把通用 HTTP 的 `operations` 复制到锐捷方案中。
+
+抓包对照提示：登录请求里 `userId` 或 `queryString` 出现 `%25`（例如 `%2540`、`%253D`）说明该部署多编码了一层，应设置 `valueEncoding: "percent"`；`password` 的 RSA 输入只反转密码本身（而不是 `密码>mac`）时设置 `passwordWithMac: false`；登录表单 `service` 为空时设置 `serviceOptional: true` 并省略 `service` 字段。成都理工大学（宜宾校区）内置方案同时使用了这三项。
 
 ## 7. 导入、检查和实际验收
 

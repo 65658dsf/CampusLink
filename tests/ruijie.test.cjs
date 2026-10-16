@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { runOperation } = require('../electron/adapters.cjs');
-const { encryptPassword } = require('../electron/ruijie.cjs');
+const { encryptPassword, rsaEncrypt } = require('../electron/ruijie.cjs');
 const { builtinRuijieProfile, validateProfile } = require('../electron/profiles.cjs');
 const { CampusService } = require('../electron/service.cjs');
 const { CampusError } = require('../electron/transport.cjs');
@@ -100,6 +100,38 @@ test('plain service encoding supports other ePortal profiles without double enco
   const body = state.calls.find(call => call.method === 'POST').body;
   assert.equal(new URLSearchParams(body).get('service'), '电信出口');
   assert.equal(body.includes('%25E7'), false);
+});
+
+async function cdutStyleFixture(t, initial = {}) {
+  const base = await fixture(t, initial);
+  const profile = validateProfile({
+    ...structuredClone(base.profile),
+    id: 'fixture-cdut-yibin',
+    fields: [],
+    ruijie: { ...base.profile.ruijie, passwordWithMac: false, serviceOptional: true, valueEncoding: 'percent' },
+  });
+  return { ...base, profile };
+}
+
+test('CDUT-Yibin style portals accept an empty service, pre-encoded values and reversed-password-only RSA', async t => {
+  // The success page carries a literal self-navigation inside a helper
+  // function; discovery must treat the current document as authoritative.
+  const selfNavigation = '<html>已登录<script>function gologinPage(){ window.location="./success.jsp"; }</script></html>';
+  const { profile, state } = await cdutStyleFixture(t, { successHtml: selfNavigation });
+  const login = await runOperation(profile, 'login', { username: '202619130115@ct', password: 'test-password&+' });
+  assert.equal(login.online, true);
+  const request = state.calls.find(call => call.method === 'POST');
+  assert.equal(request.path, '/eportal/InterFace.do?method=login');
+  const form = new URLSearchParams(request.body);
+  assert.equal(form.get('userId'), '202619130115%40ct');
+  assert.equal(form.get('service'), '');
+  assert.equal(form.get('queryString'), encodeURIComponent(rawQuery));
+  assert.equal(form.get('password'), rsaEncrypt('test-password&+', profile.ruijie.publicKey));
+  assert.equal(form.get('passwordEncrypt'), 'true');
+  assert.ok(request.body.includes('%2540'));
+  assert.ok(request.body.includes('%2526'));
+  assert.equal((await runOperation(profile, 'status')).online, true);
+  assert.equal((await runOperation(profile, 'logout', {})).online, false);
 });
 
 test('already online status and login do not transmit credentials or execute portal scripts', async t => {

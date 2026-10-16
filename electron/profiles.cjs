@@ -70,7 +70,7 @@ function validateOperation(op, name, origin, variables) {
   if (JSON.stringify(op.success) === JSON.stringify(op.failure)) fail('成功与失败判断不可相同');
 }
 function validateRuijie(value, homepage, fields) {
-  keys(value, ['discoveryUrl', 'redirectOrigins', 'publicKey', 'serviceEncoding'], 'ruijie');
+  keys(value, ['discoveryUrl', 'redirectOrigins', 'publicKey', 'serviceEncoding', 'passwordWithMac', 'serviceOptional', 'valueEncoding'], 'ruijie');
   if (value.discoveryUrl !== undefined && safeUrl(value.discoveryUrl, '锐捷发现地址').origin !== homepage.origin) fail('锐捷发现地址必须与认证页同源');
   if (value.redirectOrigins !== undefined) {
     if (!Array.isArray(value.redirectOrigins) || value.redirectOrigins.length > 8) fail('锐捷跳转来源最多 8 项');
@@ -91,9 +91,16 @@ function validateRuijie(value, homepage, fields) {
   const exponentValue = BigInt(`0x${exponent}`);
   if (exponentValue < 3n || exponentValue > 0xffffffffn || exponentValue % 2n !== 1n) fail('RSA 指数必须为 3–0xffffffff 的奇数');
   if (value.serviceEncoding !== undefined && !['plain', 'percent'].includes(value.serviceEncoding)) fail('serviceEncoding 必须为 plain 或 percent');
+  if (value.passwordWithMac !== undefined && typeof value.passwordWithMac !== 'boolean') fail('passwordWithMac 必须为布尔值');
+  if (value.serviceOptional !== undefined && typeof value.serviceOptional !== 'boolean') fail('serviceOptional 必须为布尔值');
+  if (value.valueEncoding !== undefined && !['plain', 'percent'].includes(value.valueEncoding)) fail('valueEncoding 必须为 plain 或 percent');
   const service = fields?.find(field => field.key === 'service');
-  if (!service || (service.default === undefined && !service.options)) fail('锐捷方案必须声明 service 字符串字段，并提供默认值或选项');
-  if ((service.default !== undefined && !service.default.trim()) || service.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
+  if (value.serviceOptional === true) {
+    if (service?.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
+  } else {
+    if (!service || (service.default === undefined && !service.options)) fail('锐捷方案必须声明 service 字符串字段，并提供默认值或选项');
+    if ((service.default !== undefined && !service.default.trim()) || service.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
+  }
 }
 function validateProfile(value, { builtin = false } = {}) {
   keys(value, ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'portalDiscovery'], '连接方案');
@@ -208,6 +215,32 @@ const builtinRuijieProfile = validateProfile({
     serviceEncoding: 'percent',
   },
 }, { builtin: true });
-const builtinProfiles = [builtinProfile, builtinRuijieProfile];
 
-module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, profileParameters, safeUrl, keys };
+// Verified 2026-10-16 against a real capture from 成都理工大学（宜宾校区）:
+// the portal ships the same default 1024-bit Ruijie RSA key as SCU but
+// encrypts the reversed password alone, submits an empty service and
+// double-encodes the account and query string in the login form.
+const builtinCdutYibinProfile = validateProfile({
+  schemaVersion: 1,
+  id: 'builtin-cdut-yibin-ruijie',
+  name: '成都理工大学（宜宾校区）· 锐捷 ePortal',
+  description: '成都理工大学宜宾校区锐捷 ePortal 认证（2026-10-16 依据真实抓包核验）；请先连接 CDUTYB-WEB 无线或校园有线网络。登录不选择网络服务，使用学校统一认证账号。',
+  version: '1.0.0', author: 'NingMeng123', homepage: 'http://10.26.30.253/',
+  protocol: 'ruijie', timeoutMs: 10000,
+  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
+  ruijie: {
+    discoveryUrl: 'http://10.26.30.253/',
+    redirectOrigins: [],
+    publicKey: {
+      modulus: '94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871',
+      exponent: '10001',
+    },
+    passwordWithMac: false,
+    serviceOptional: true,
+    valueEncoding: 'percent',
+  },
+}, { builtin: true });
+
+const builtinProfiles = [builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile];
+
+module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, profileParameters, safeUrl, keys };
