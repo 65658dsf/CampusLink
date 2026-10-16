@@ -134,7 +134,7 @@ GET http://192.168.2.135/
 
 这里只能配置以上能力。添加 `headers`、动态脚本、任意 API 路径或未知属性会被拒绝，不能把通用 HTTP 的 `operations` 复制到锐捷方案中。
 
-抓包对照提示：登录请求里 `userId` 或 `queryString` 出现 `%25`（例如 `%2540`、`%253D`）说明该部署多编码了一层，应设置 `valueEncoding: "percent"`；`password` 的 RSA 输入只反转密码本身（而不是 `密码>mac`）时设置 `passwordWithMac: false`；登录表单 `service` 为空时设置 `serviceOptional: true` 并省略 `service` 字段。成都理工大学（宜宾校区）内置方案同时使用了这三项。
+抓包对照提示：登录请求里 `userId` 或 `queryString` 出现 `%25`（例如 `%2540`、`%253D`）说明该部署多编码了一层，应设置 `valueEncoding: "percent"`；登录表单 `service` 为空时设置 `serviceOptional: true` 并省略 `service` 字段；只有确认登录页不是按 `密码>mac` 拼接再加密（例如页面脚本直接把密码本身交给 RSA）时才设置 `passwordWithMac: false`。成都理工大学（宜宾校区）内置方案使用其中的 `valueEncoding` 与 `serviceOptional` 两项，密码加密与川大相同。
 
 ## 7. 导入、检查和实际验收
 

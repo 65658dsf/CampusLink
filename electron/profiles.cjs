@@ -216,10 +216,10 @@ const builtinRuijieProfile = validateProfile({
   },
 }, { builtin: true });
 
-// Verified 2026-10-16 against a real capture from 成都理工大学（宜宾校区）:
-// the portal ships the same default 1024-bit Ruijie RSA key as SCU but
-// encrypts the reversed password alone, submits an empty service and
-// double-encodes the account and query string in the login form.
+// Verified 2026-10-16 against a real capture and the live portal of
+// 成都理工大学（宜宾校区）: same default 1024-bit Ruijie RSA key and the same
+// `password>mac` RSA input as SCU, but the portal submits an empty service
+// and double-encodes the account and query string in the login form.
 const builtinCdutYibinProfile = validateProfile({
   schemaVersion: 1,
   id: 'builtin-cdut-yibin-ruijie',
@@ -235,7 +235,6 @@ const builtinCdutYibinProfile = validateProfile({
       modulus: '94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871',
       exponent: '10001',
     },
-    passwordWithMac: false,
     serviceOptional: true,
     valueEncoding: 'percent',
   },

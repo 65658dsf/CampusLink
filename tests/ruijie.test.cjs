@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { runOperation } = require('../electron/adapters.cjs');
-const { encryptPassword, rsaEncrypt } = require('../electron/ruijie.cjs');
+const { encryptPassword } = require('../electron/ruijie.cjs');
 const { builtinRuijieProfile, validateProfile } = require('../electron/profiles.cjs');
 const { CampusService } = require('../electron/service.cjs');
 const { CampusError } = require('../electron/transport.cjs');
@@ -108,12 +108,12 @@ async function cdutStyleFixture(t, initial = {}) {
     ...structuredClone(base.profile),
     id: 'fixture-cdut-yibin',
     fields: [],
-    ruijie: { ...base.profile.ruijie, passwordWithMac: false, serviceOptional: true, valueEncoding: 'percent' },
+    ruijie: { ...base.profile.ruijie, serviceOptional: true, valueEncoding: 'percent' },
   });
   return { ...base, profile };
 }
 
-test('CDUT-Yibin style portals accept an empty service, pre-encoded values and reversed-password-only RSA', async t => {
+test('CDUT-Yibin style portals accept an empty service with double-encoded values and password>mac RSA', async t => {
   // The success page carries a literal self-navigation inside a helper
   // function; discovery must treat the current document as authoritative.
   const selfNavigation = '<html>已登录<script>function gologinPage(){ window.location="./success.jsp"; }</script></html>';
@@ -126,7 +126,7 @@ test('CDUT-Yibin style portals accept an empty service, pre-encoded values and r
   assert.equal(form.get('userId'), '202619130115%40ct');
   assert.equal(form.get('service'), '');
   assert.equal(form.get('queryString'), encodeURIComponent(rawQuery));
-  assert.equal(form.get('password'), rsaEncrypt('test-password&+', profile.ruijie.publicKey));
+  assert.equal(form.get('password'), encryptPassword('test-password&+', mac, profile.ruijie.publicKey));
   assert.equal(form.get('passwordEncrypt'), 'true');
   assert.ok(request.body.includes('%2540'));
   assert.ok(request.body.includes('%2526'));

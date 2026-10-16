@@ -185,7 +185,6 @@ test('all built-in profiles are listed and protected, and selecting Ruijie initi
     assert.throws(() => service.removeProfile(profile.id), /内置/);
   }
   assert.equal(builtinCdutYibinProfile.homepage, 'http://10.26.30.253/');
-  assert.equal(builtinCdutYibinProfile.ruijie.passwordWithMac, false);
   assert.equal(builtinCdutYibinProfile.ruijie.serviceOptional, true);
   assert.equal(builtinCdutYibinProfile.ruijie.valueEncoding, 'percent');
   assert.deepEqual(profileParameters(builtinCdutYibinProfile), {});
