@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { CampusService, defaults } = require('../electron/service.cjs');
+const { builtinProfile, profileParameters } = require('../electron/profiles.cjs');
 const { CampusError } = require('../electron/transport.cjs');
 const example = require('../examples/custom-campus.example.json');
 
@@ -54,15 +55,16 @@ function fixture(t, operation, saved) {
     decryptString: value => [...value.toString()].reverse().join(''),
   } });
   t.after(() => { service.dispose(); fs.rmSync(directory, { recursive: true, force: true }); });
+  if (!saved) service.saveSettings({ profileId: builtinProfile.id });
   return { service, clock };
 }
 
 test('old settings migrate to optional reconnection defaults and interval is validated', t => {
-  const settings = defaults();
+  const settings = { ...defaults(), profileId: builtinProfile.id, parameters: profileParameters(builtinProfile) };
   delete settings.autoReconnect; delete settings.reconnectIntervalSeconds;
   const { service, clock } = fixture(t, async () => ({ online: false }), { version: 1, settings, profiles: [], credential: null });
   assert.equal(service.settings.autoReconnect, true);
-  assert.equal(service.settings.reconnectIntervalSeconds, 30);
+  assert.equal(service.settings.reconnectIntervalSeconds, 10);
   assert.equal(clock.count, 0);
   for (const value of [4, 3601, 2.5, '30', null]) assert.throws(() => service.saveSettings({ reconnectIntervalSeconds: value }), /5 至 3600/);
   assert.throws(() => service.saveSettings({ autoReconnect: 'true' }), /设置值/);
@@ -86,7 +88,7 @@ test('an offline or unknown startup never starts first login solely because reco
 test('an uncanceled offline startup still authenticates once with its opted-in saved credential', async t => {
   const calls = [];
   const password = 'startup-fixture-password';
-  const settings = { ...defaults(), username: 'startup-account', rememberPassword: true, autoConnect: true };
+  const settings = { ...defaults(), profileId: builtinProfile.id, parameters: profileParameters(builtinProfile), username: 'startup-account', rememberPassword: true, autoConnect: true };
   const encrypted = Buffer.from([...password].reverse().join('')).toString('base64');
   const { service, clock } = fixture(t, async (_profile, action, context) => {
     calls.push(action);
@@ -104,7 +106,7 @@ test('canceling an in-flight startup query prevents its saved-credential automat
   for (const cancellation of ['dispose', 'manual-logout']) {
     let finish;
     const calls = [];
-    const settings = { ...defaults(), username: 'startup-account', rememberPassword: true, autoConnect: true };
+    const settings = { ...defaults(), profileId: builtinProfile.id, parameters: profileParameters(builtinProfile), username: 'startup-account', rememberPassword: true, autoConnect: true };
     const encrypted = Buffer.from([...'startup-fixture-password'].reverse().join('')).toString('base64');
     const { service, clock } = fixture(t, async (_profile, action) => {
       calls.push(action);
@@ -137,7 +139,7 @@ test('a disposed service cannot start another initialization or explicit login',
   await assert.rejects(service.connect({ username: 'startup-account', password: 'startup-fixture-password' }), /已停止/);
   assert.deepEqual(calls, []);
   assert.equal(clock.count, 0);
-  assert.equal(fs.existsSync(service.file), false);
+  assert.equal(JSON.parse(fs.readFileSync(service.file)).credential, null);
 });
 
 test('successful login arms a single timer and reuses a session password without persisting it', async t => {
@@ -151,10 +153,10 @@ test('successful login arms a single timer and reuses a session password without
   });
   await service.connect({ username: 'local-monitor-account', password, rememberPassword: false });
   assert.equal(service.snapshot().connection.monitoring, true);
-  assert.equal(clock.delay, 30000);
+  assert.equal(clock.delay, 10000);
   assert.equal(clock.count, 1);
   online = false;
-  await clock.advance(29999);
+  await clock.advance(9999);
   assert.deepEqual(calls.map(call => call.action), ['login']);
   await clock.advance(1);
   assert.deepEqual(calls.map(call => call.action), ['login', 'status', 'login']);
@@ -172,7 +174,7 @@ test('startup can monitor a browser session and later reconnect with a saved pas
   const calls = [];
   const password = 'saved-monitor-password';
   let online = true;
-  const settings = { ...defaults(), username: 'saved-account', rememberPassword: true };
+  const settings = { ...defaults(), profileId: builtinProfile.id, parameters: profileParameters(builtinProfile), username: 'saved-account', rememberPassword: true };
   const { service, clock } = fixture(t, async (_profile, action, context) => {
     calls.push(action);
     if (action === 'login') { assert.equal(context.password, password); online = true; }
@@ -182,7 +184,7 @@ test('startup can monitor a browser session and later reconnect with a saved pas
   assert.equal(service.settings.autoConnect, false);
   assert.equal(service.snapshot().connection.monitoring, true);
   online = false;
-  await clock.advance(30000);
+  await clock.advance(10000);
   assert.deepEqual(calls, ['status', 'status', 'login']);
 });
 
@@ -199,10 +201,42 @@ test('reconnecting with the in-memory session does not re-encrypt or rewrite sav
   service.safeStorage.isEncryptionAvailable = () => false;
   service.persist = () => { throw new Error('automatic checks must not rewrite settings'); };
   online = false;
-  await clock.advance(30000);
+  await clock.advance(10000);
   assert.deepEqual(calls, ['login', 'status', 'login']);
   assert.equal(service.connection.status, 'connected');
   assert.equal(fs.readFileSync(service.file, 'utf8'), saved);
+});
+
+test('saving an updated password replaces session and offline reconnect credentials', async t => {
+  for (const saveWhileOnline of [true, false]) {
+    let online = true;
+    const loginPasswords = [];
+    const { service, clock } = fixture(t, async (_profile, action, context) => {
+      if (action === 'login') { loginPasswords.push(context.password); online = true; }
+      return { online, message: 'ok' };
+    });
+    await service.connect({ username: 'saved-account', password: 'old-password' });
+    if (!saveWhileOnline) {
+      online = false;
+      await service.checkStatus();
+      assert.equal(service.session, null);
+    }
+    service.setCredentials({ username: 'saved-account', password: 'updated-password' });
+    assert.equal(service.reconnectContext.password, 'updated-password');
+    if (saveWhileOnline) {
+      assert.equal(service.session.password, 'updated-password');
+      // An online check re-arms the guard by copying session credentials.
+      await service.checkStatus();
+      assert.equal(service.reconnectContext.password, 'updated-password');
+    }
+    online = false;
+    await clock.advance(10000);
+    assert.deepEqual(loginPasswords, ['old-password', 'updated-password']);
+    assert.equal(service.connection.status, 'connected');
+    const disk = fs.readFileSync(service.file, 'utf8');
+    assert.equal(disk.includes('updated-password'), false);
+    assert.equal(disk.includes('old-password'), false);
+  }
 });
 
 test('unknown status never sends a password and failed reconnections occur at most once per interval', async t => {
@@ -216,13 +250,13 @@ test('unknown status never sends a password and failed reconnections occur at mo
   });
   await service.connect({ username: 'local-account', password: 'local-password' });
   status = 'unknown';
-  await clock.advance(60000);
+  await clock.advance(20000);
   assert.deepEqual(calls, ['login', 'status', 'status']);
   status = 'offline'; failLogin = true;
-  await clock.advance(30000);
+  await clock.advance(10000);
   assert.deepEqual(calls.slice(-2), ['status', 'login']);
   const loginCount = calls.filter(action => action === 'login').length;
-  await clock.advance(29999);
+  await clock.advance(9999);
   assert.equal(calls.filter(action => action === 'login').length, loginCount);
   await clock.advance(1);
   assert.equal(calls.filter(action => action === 'login').length, loginCount + 1);
@@ -235,7 +269,7 @@ test('a browser session without credentials keeps checking with one actionable w
   const { service, clock } = fixture(t, async (_profile, action) => { calls.push(action); return { online, message: 'ok' }; });
   await service.initialize();
   online = false;
-  await clock.advance(90000);
+  await clock.advance(30000);
   assert.deepEqual(calls, ['status', 'status', 'status', 'status']);
   assert.equal(service.logs.filter(entry => entry.message.includes('没有可用密码')).length, 1);
   assert.equal(service.snapshot().connection.monitoring, true);
@@ -308,7 +342,7 @@ test('clearing credentials removes the memory reconnect password and does not re
   await service.connect({ username: 'local-account', password: 'local-password', rememberPassword: true });
   service.clearCredentials();
   online = false;
-  await clock.advance(60000);
+  await clock.advance(20000);
   assert.deepEqual(calls, ['login', 'status', 'status']);
   assert.equal(service.reconnectContext, null);
   assert.equal(service.snapshot().hasPassword, false);
@@ -368,7 +402,7 @@ test('a timer that meets a busy manual check waits another interval instead of o
   await clock.fireNext();
   assert.deepEqual(calls, ['status', 'status']);
   assert.equal(clock.count, 1);
-  assert.equal(clock.delay, 30000);
+  assert.equal(clock.delay, 10000);
   finish({ online: true, message: 'online' });
   await manual;
   assert.equal(clock.count, 1);
@@ -381,13 +415,82 @@ test('manual reconnection resets an older pending deadline to a full interval', 
     return { online, message: 'ok' };
   });
   await service.connect({ username: 'local-account', password: 'local-password' });
-  await clock.advance(29000);
+  await clock.advance(9000);
   online = false;
   await service.checkStatus();
   assert.equal(clock.delay, 1000);
   await service.connect({ password: 'local-password' });
-  assert.equal(clock.delay, 30000);
+  assert.equal(clock.delay, 10000);
   assert.equal(clock.count, 1);
+});
+
+test('tray pause stops detection without ending the session and resume re-arms when online', async t => {
+  let online = true;
+  const calls = [];
+  const { service, clock } = fixture(t, async (_profile, action) => { calls.push(action); return { online, message: 'ok' }; });
+  await service.connect({ username: 'local-account', password: 'local-password' });
+  assert.equal(service.snapshot().connection.monitoring, true);
+  assert.equal(clock.count, 1);
+  service.setGuardPaused(true);
+  assert.equal(service.snapshot().connection.reconnectPaused, true);
+  assert.equal(service.snapshot().connection.monitoring, false);
+  assert.equal(clock.count, 0);
+  online = false;
+  await clock.advance(90000);
+  assert.deepEqual(calls, ['login'], 'paused guard performs no checks');
+  assert.ok(service.session, 'pausing keeps the current session');
+  service.setGuardPaused(false);
+  assert.equal(service.snapshot().connection.reconnectPaused, false);
+  assert.equal(service.snapshot().connection.monitoring, true);
+  assert.equal(clock.count, 1);
+  assert.equal(clock.delay, 10000);
+  await clock.advance(10000);
+  assert.deepEqual(calls, ['login', 'status', 'login']);
+  assert.equal(service.connection.status, 'connected');
+});
+
+test('resuming while offline only clears the flag and disposed services ignore pause changes', async t => {
+  const calls = [];
+  const { service, clock } = fixture(t, async (_profile, action) => { calls.push(action); return { online: false, message: 'offline' }; });
+  await service.initialize();
+  assert.equal(service.snapshot().connection.monitoring, false);
+  service.setGuardPaused(true);
+  assert.equal(service.snapshot().connection.reconnectPaused, true);
+  service.setGuardPaused(false);
+  assert.equal(service.snapshot().connection.reconnectPaused, false);
+  assert.equal(clock.count, 0, 'an offline resume does not arm the guard');
+  service.dispose();
+  service.setGuardPaused(true);
+  assert.equal(service.snapshot().connection.reconnectPaused, false, 'disposed services ignore pause changes');
+  assert.deepEqual(calls, ['status']);
+});
+
+test('resuming a previously armed guard after an in-flight offline or failed check restarts detection', async t => {
+  for (const failed of [false, true]) {
+    const calls = [];
+    let finish, delay = false;
+    const { service, clock } = fixture(t, async (_profile, action) => {
+      calls.push(action);
+      if (action === 'status' && delay) return new Promise((resolve, reject) => { finish = () => failed ? reject(new CampusError('unknown', 'TIMEOUT')) : resolve({ online: false, message: 'offline' }); });
+      return { online: action === 'login', message: 'ok' };
+    });
+    await service.connect({ username: 'local-account', password: 'local-password' });
+    delay = true;
+    const pending = clock.fireNext();
+    service.setGuardPaused(true);
+    assert.equal(clock.count, 0);
+    finish();
+    await pending;
+    assert.equal(service.connection.status, failed ? 'error' : 'idle');
+    service.setGuardPaused(false);
+    assert.equal(service.snapshot().connection.monitoring, true);
+    assert.equal(clock.count, 1);
+    assert.equal(clock.delay, 10000);
+    delay = false;
+    await clock.advance(10000);
+    assert.deepEqual(calls, ['login', 'status', 'status', 'login']);
+    assert.equal(service.connection.status, 'connected');
+  }
 });
 
 test('dispose prevents a pending status or login completion from restarting the monitor', async t => {

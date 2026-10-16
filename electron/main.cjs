@@ -3,10 +3,13 @@
 const { app, BrowserWindow, ipcMain, safeStorage, dialog, shell, Tray, Menu, nativeImage, session, powerMonitor, clipboard } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { CampusService } = require('./service.cjs');
 const { MAX_PROFILE_BYTES, safeUrl, parseProfile, exportProfile, exportProfileJson } = require('./profiles.cjs');
 const { UpdateChecker, safeReleaseUrl } = require('./updates.cjs');
+const { buildDiagnosticsReport } = require('./diagnostics-export.cjs');
+const { createNetworkWatcher } = require('./network-watch.cjs');
 
 app.setName('岚连 · Campus Link');
 app.setAppUserModelId('cn.campuslink.desktop');
@@ -15,6 +18,8 @@ const isPrimary = app.requestSingleInstanceLock();
 let win = null;
 let tray = null;
 let service = null;
+let networkWatcher = null;
+let tooltipTimer = null;
 let updates = null;
 let updateRetry = null;
 let lastConnectionStatus = 'idle';
@@ -55,6 +60,7 @@ function registerIpc() {
     const snapshot = service.saveSettings(patch);
     return previousProfile !== service.settings.profileId ? service.checkStatus() : snapshot;
   });
+  handle('saveCredentials', input => service.setCredentials(input));
   handle('connect', input => service.connect(input));
   handle('disconnect', () => service.disconnect());
   handle('checkStatus', () => service.checkStatus());
@@ -92,6 +98,15 @@ function registerIpc() {
     service.log('success', '连接方案示例已保存。');
     return { canceled: false, path: result.filePath };
   });
+  handle('exportDiagnostics', async () => {
+    const report = buildDiagnosticsReport(service.snapshot());
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const result = await dialog.showSaveDialog(win, { title: '导出诊断包', defaultPath: `campuslink-diagnostics-${stamp}.json`, filters: [{ name: '诊断包 JSON', extensions: ['json'] }] });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    fs.writeFileSync(result.filePath, report, { encoding: 'utf8', mode: 0o600 });
+    service.log('success', '诊断包已导出。');
+    return { canceled: false, path: result.filePath };
+  });
   handle('exportProfile', async id => {
     if (typeof id !== 'string' || !id) throw new Error('请选择要导出的连接方案。');
     // Export the stored definition, never the public snapshot, credentials,
@@ -106,6 +121,10 @@ function registerIpc() {
   handle('openPortal', async id => {
     const profile = service.profile(id);
     const url = safeUrl(profile.portalDiscovery?.url ?? profile.homepage);
+    await shell.openExternal(url.href);
+  });
+  handle('openUrl', async value => {
+    const url = safeUrl(value, '外部链接');
     await shell.openExternal(url.href);
   });
   handle('windowAction', action => {
@@ -142,15 +161,57 @@ async function checkUpdatesAfterConnection() {
 function trayAction(action) {
   Promise.resolve().then(action).catch(() => service.log('warning', '操作未完成，请打开主窗口检查当前设置。'));
 }
+function ipv4ToInt(value) {
+  const parts = String(value).split('.').map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return 0;
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+}
+function activeIPv4(portalUrl) {
+  // 优先选择与认证服务器同网段的活动网卡地址（锐捷适配器不上报客户端 IP）。
+  try {
+    const candidates = [];
+    for (const addresses of Object.values(os.networkInterfaces() || {})) {
+      for (const address of addresses || []) {
+        if (address.internal || (address.family !== 'IPv4' && address.family !== 4)) continue;
+        candidates.push({ address: address.address, netmask: address.netmask || '' });
+      }
+    }
+    const target = portalUrl ? new URL(portalUrl).hostname : '';
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(target)) {
+      const targetValue = ipv4ToInt(target);
+      const same = candidates.find(item => item.netmask && (ipv4ToInt(item.address) & ipv4ToInt(item.netmask)) === (targetValue & ipv4ToInt(item.netmask)));
+      if (same) return same.address;
+    }
+    return candidates[0]?.address || '';
+  } catch { return ''; }
+}
+function formatDuration(milliseconds) {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} 分钟`;
+  return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`;
+}
+function trayTooltip(snapshot) {
+  if (snapshot.connection.status !== 'connected') return '岚连 · 校园网连接工具';
+  let portalUrl = '';
+  try { portalUrl = service.profile().homepage; } catch { /* 方案异常时退回本机网卡地址 */ }
+  const ip = snapshot.connection.ip || activeIPv4(portalUrl);
+  const since = typeof snapshot.connection.since === 'string' ? Date.parse(snapshot.connection.since) : NaN;
+  const duration = Number.isFinite(since) ? formatDuration(Date.now() - since) : '';
+  return ['岚连 · 已连接', ip ? `IP ${ip}` : '', duration ? `在线 ${duration}` : ''].filter(Boolean).join(' ｜ ');
+}
 function updateTray(snapshot) {
   if (!tray || tray.isDestroyed()) return;
   const busy = snapshot.connection.refreshing || ['checking', 'connecting', 'disconnecting'].includes(snapshot.connection.status);
-  tray.setToolTip(`岚连 · ${snapshot.connection.status === 'connected' ? '校园网已连接' : '校园网连接工具'}`);
+  const connected = snapshot.connection.status === 'connected';
+  tray.setToolTip(trayTooltip(snapshot));
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开岚连', click: showWindow },
     { type: 'separator' },
-    { label: '查询认证状态', enabled: !busy, click: () => trayAction(() => service.checkStatus()) },
-    { label: '连接校园网', enabled: !busy && !snapshot.connection.canDisconnect && snapshot.hasPassword, click: () => trayAction(() => service.connect({})) },
+    { label: '查询认证状态', enabled: !busy && Boolean(snapshot.settings.profileId), click: () => trayAction(() => service.checkStatus()) },
+    { label: snapshot.connection.reconnectPaused ? '恢复守护' : '暂停守护', enabled: snapshot.connection.reconnectPaused || (snapshot.settings.autoReconnect && connected), click: () => trayAction(() => service.setGuardPaused(!service.reconnectPaused)) },
+    { label: '连接校园网', enabled: !busy && Boolean(snapshot.settings.profileId) && !snapshot.connection.canDisconnect && snapshot.hasPassword, click: () => trayAction(() => service.connect({})) },
     { label: '断开认证', enabled: !busy && snapshot.connection.canDisconnect, click: () => trayAction(() => service.disconnect()) },
     { type: 'separator' },
     { label: '退出岚连', click: () => { quitting = true; app.quit(); } },
@@ -194,7 +255,7 @@ function createWindow() {
 if (!isPrimary) app.quit();
 else {
   app.on('second-instance', showWindow);
-  app.on('before-quit', () => { quitting = true; clearTimeout(updateRetry); service?.dispose(); });
+  app.on('before-quit', () => { quitting = true; clearTimeout(updateRetry); if (tooltipTimer) { clearInterval(tooltipTimer); tooltipTimer = null; } networkWatcher?.stop(); service?.dispose(); });
   app.on('window-all-closed', () => { if (!tray || quitting) app.quit(); });
   app.on('activate', showWindow);
   app.whenReady().then(() => {
@@ -230,6 +291,13 @@ else {
       lastConnectionStatus = snapshot.connection.status;
     });
     updateTray(service.snapshot());
+    networkWatcher = createNetworkWatcher({ onChange: () => { void service.onNetworkChanged().catch(() => {}); } });
+    networkWatcher.start();
+    tooltipTimer = setInterval(() => {
+      if (!service || service.disposed || service.snapshot().connection.status !== 'connected') return;
+      updateTray(service.snapshot());
+    }, 30000);
+    tooltipTimer?.unref?.();
     void service.initialize().catch(() => service.log('warning', '启动状态检查未完成，请点击检测网络重试。'));
     powerMonitor.on('resume', () => { void service.refreshStatus().catch(() => {}); });
   }).catch(() => {

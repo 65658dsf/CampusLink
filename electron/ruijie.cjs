@@ -9,14 +9,14 @@ const MAX_HOPS = 6;
 const MAX_QUERY = 16384;
 const PATHS = { login: '/eportal/index.jsp', online: '/eportal/success.jsp', api: '/eportal/InterFace.do' };
 
-function encryptPassword(password, mac, publicKey) {
+function rsaEncrypt(value, publicKey) {
   const exponent = BigInt(`0x${publicKey.exponent}`);
   const modulus = BigInt(`0x${publicKey.modulus}`);
   const bits = modulus.toString(2).length;
   if (bits < 512 || bits > 4096 || !(modulus & 1n) || exponent < 3n || exponent > 0xffffffffn || !(exponent & 1n)) throw new CampusError('锐捷 RSA 公钥配置无效。', 'INVALID_PROFILE');
   // This legacy browser protocol packs UTF-16 code units into little-endian
   // words. Reversing code units is intentional; UTF-8/OAEP would not match it.
-  const input = `${password}>${mac}`.split('').reverse().map(character => character.charCodeAt(0));
+  const input = String(value).split('').reverse().map(character => character.charCodeAt(0));
   const chunkSize = 2 * Math.ceil(bits / 16);
   while (input.length % chunkSize) input.push(0);
   const parts = [];
@@ -34,6 +34,12 @@ function encryptPassword(password, mac, publicKey) {
   return parts.join(' ');
 }
 
+function encryptPassword(password, mac, publicKey) {
+  // The SCU and CDUT-Yibin profiles pack `password>mac`; a profile may opt
+  // into password-only encryption after verifying its portal's script.
+  return rsaEncrypt(`${password}>${mac}`, publicKey);
+}
+
 function allowedUrl(value, base, profile) {
   let url;
   try { url = new URL(value, base); } catch { throw new CampusError('锐捷认证页返回了无效跳转地址。', 'PORTAL_REDIRECT'); }
@@ -42,10 +48,12 @@ function allowedUrl(value, base, profile) {
   return url;
 }
 
-function queryContext(url) {
+function queryContext(url, requireMac = true) {
   const queryString = url.search.slice(1);
-  const mac = url.searchParams.get('mac');
-  if (!queryString || queryString.length > MAX_QUERY || !mac || mac.length > 256 || /[\s\u0000-\u001f]/.test(mac)) throw new CampusError('锐捷认证页缺少有效的设备参数，请连接校园网络后打开认证页检查。', 'PORTAL_PARAMETERS');
+  const mac = url.searchParams.get('mac') || '';
+  // Profiles that encrypt the reversed password alone do not need the device
+  // identifier, but the query string itself must still be present.
+  if (!queryString || queryString.length > MAX_QUERY || (requireMac && (!mac || mac.length > 256 || /[\s\u0000-\u001f]/.test(mac)))) throw new CampusError('锐捷认证页缺少有效的设备参数，请连接校园网络后打开认证页检查。', 'PORTAL_PARAMETERS');
   return { queryString, mac };
 }
 
@@ -126,7 +134,17 @@ function createPortalSession(profile, requester, onSecret) {
         continue;
       }
       const target = htmlTarget(response.body);
-      if (target) { current = allowedUrl(target, current, profile); continue; }
+      if (target) {
+        const next = allowedUrl(target, current, profile);
+        // Portals ship literal self-navigation inside helper functions (for
+        // example the success page's `window.location="./success.jsp"`).
+        // Ignore a helper's refresh while preserving real same-path redirects
+        // that supply new device/session parameters in the query string.
+        if (next.origin !== current.origin || next.pathname !== current.pathname || (next.search && next.search !== current.search)) {
+          current = next;
+          continue;
+        }
+      }
       // An approved discovery host can supply a URL, but only the configured
       // authentication origin's actual success page confirms an online session.
       if (current.origin === new URL(profile.homepage).origin && current.pathname.toLowerCase() === PATHS.online) {
@@ -135,7 +153,7 @@ function createPortalSession(profile, requester, onSecret) {
         return { online: true, userIndex, message: '已通过锐捷校园网认证。' };
       }
       if (current.origin === new URL(profile.homepage).origin && current.pathname.toLowerCase() === PATHS.login) {
-        const context = queryContext(current);
+        const context = queryContext(current, profile.ruijie.passwordWithMac !== false);
         remember(context.queryString); remember(context.mac);
         return { online: false, ...context, message: '当前尚未通过锐捷校园网认证。' };
       }
@@ -159,10 +177,22 @@ function createPortalSession(profile, requester, onSecret) {
   return { discover, api, remember };
 }
 
+// 服务器拒绝文案 → 可操作提示（含成都理工大学宜宾校区实测样本与常见锐捷文案）。
+const REJECTION_HINTS = [
+  [/用户名或密码错误|用户名或者密码错误|账号或密码错误|密码错误/, '账号或密码未被服务器接受：请确认使用完整账号（例如学号加运营商后缀，如 @ct），并可在学校自助服务平台核对或找回密码后重试。'],
+  [/同时在线上限|在线设备|设备.{0,8}(?:上限|超限)|超出.{0,8}(?:限制|数量)/, '账号在线设备数可能已达上限：请打开学校自助服务平台下线其它设备后重试。'],
+  [/欠费|余额|停机|欠款|已过期|到期|套餐/, '账号状态可能异常（欠费或套餐到期）：请到学校自助服务平台处理后再试。'],
+  [/不存在|无此用户|未注册|未开通|未绑定/, '账号可能尚未开通或未绑定校园网：请先在自助服务平台完成绑定后再试。'],
+];
+
 function rejected(data, operation) {
   const detail = typeof data.message === 'string' ? data.message.slice(0, 300) : '';
   if (/验证码|captcha/i.test(detail)) throw new CampusError('锐捷认证需要验证码，请打开认证页完成验证后再检测状态。', 'CAPTCHA_REQUIRED');
-  throw new CampusError(`${operation === 'logout' ? '锐捷注销未成功' : '锐捷认证被拒绝，请检查账号、密码和网络服务'}。${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
+  const hint = REJECTION_HINTS.find(([pattern]) => pattern.test(detail))?.[1] || '';
+  if (operation === 'logout') {
+    throw new CampusError(`锐捷注销未成功。${hint ? ` ${hint}` : ''}${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
+  }
+  throw new CampusError(`${hint || '锐捷认证被拒绝，请检查账号、密码和网络服务。'}${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
 }
 
 async function ruijieOperation(profile, operation, context, requester, onSecret = () => {}) {
@@ -175,13 +205,21 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
   let data;
   if (operation === 'login') {
     const service = context.parameters?.service ?? profile.fields?.find(field => field.key === 'service')?.default ?? '';
-    if (!service || !context.username || !context.password) throw new CampusError('请填写校园网账号、密码并选择网络服务。', 'INVALID_PARAMETERS');
-    const password = encryptPassword(context.password, status.mac, profile.ruijie.publicKey);
+    const serviceRequired = profile.ruijie.serviceOptional !== true;
+    if ((serviceRequired && !service) || !context.username || !context.password) throw new CampusError(serviceRequired ? '请填写校园网账号、密码并选择网络服务。' : '请填写校园网账号和密码。', 'INVALID_PARAMETERS');
+    // Password-only encryption is opt-in; both built-in ePortal schools use
+    // the default `password>mac` transform.
+    const password = profile.ruijie.passwordWithMac === false
+      ? rsaEncrypt(context.password, profile.ruijie.publicKey)
+      : encryptPassword(context.password, status.mac, profile.ruijie.publicKey);
     portal.remember(password);
+    // CDUT-Yibin pre-encodes the account and query string once before the
+    // portal form is serialized, so both appear double-encoded on the wire.
+    const encodeValue = value => profile.ruijie.valueEncoding === 'percent' ? encodeURIComponent(value) : value;
     data = await portal.api('login', {
-      userId: context.username, password,
+      userId: encodeValue(context.username), password,
       service: profile.ruijie.serviceEncoding === 'percent' ? encodeURIComponent(service) : service,
-      queryString: status.queryString, operatorPwd: '', operatorUserId: '', validcode: '', passwordEncrypt: 'true',
+      queryString: encodeValue(status.queryString), operatorPwd: '', operatorUserId: '', validcode: '', passwordEncrypt: 'true',
     });
   } else {
     // SCU's own Go implementation uses an empty logout body; deployments which
@@ -196,4 +234,4 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
   return { online: verified.online, message: operation === 'login' ? '锐捷校园网认证成功。' : '已退出锐捷校园网认证。' };
 }
 
-module.exports = { ruijieOperation, encryptPassword, allowedUrl, queryContext, htmlTarget };
+module.exports = { ruijieOperation, encryptPassword, rsaEncrypt, allowedUrl, queryContext, htmlTarget };

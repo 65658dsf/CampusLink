@@ -102,6 +102,38 @@ test('plain service encoding supports other ePortal profiles without double enco
   assert.equal(body.includes('%25E7'), false);
 });
 
+async function cdutStyleFixture(t, initial = {}) {
+  const base = await fixture(t, initial);
+  const profile = validateProfile({
+    ...structuredClone(base.profile),
+    id: 'fixture-cdut-yibin',
+    fields: [],
+    ruijie: { ...base.profile.ruijie, serviceOptional: true, valueEncoding: 'percent' },
+  });
+  return { ...base, profile };
+}
+
+test('CDUT-Yibin style portals accept an empty service with double-encoded values and password>mac RSA', async t => {
+  // The success page carries a literal self-navigation inside a helper
+  // function; discovery must treat the current document as authoritative.
+  const selfNavigation = '<html>已登录<script>function gologinPage(){ window.location="./success.jsp"; }</script></html>';
+  const { profile, state } = await cdutStyleFixture(t, { successHtml: selfNavigation });
+  const login = await runOperation(profile, 'login', { username: '202619130115@ct', password: 'test-password&+' });
+  assert.equal(login.online, true);
+  const request = state.calls.find(call => call.method === 'POST');
+  assert.equal(request.path, '/eportal/InterFace.do?method=login');
+  const form = new URLSearchParams(request.body);
+  assert.equal(form.get('userId'), '202619130115%40ct');
+  assert.equal(form.get('service'), '');
+  assert.equal(form.get('queryString'), encodeURIComponent(rawQuery));
+  assert.equal(form.get('password'), encryptPassword('test-password&+', mac, profile.ruijie.publicKey));
+  assert.equal(form.get('passwordEncrypt'), 'true');
+  assert.ok(request.body.includes('%2540'));
+  assert.ok(request.body.includes('%2526'));
+  assert.equal((await runOperation(profile, 'status')).online, true);
+  assert.equal((await runOperation(profile, 'logout', {})).online, false);
+});
+
 test('already online status and login do not transmit credentials or execute portal scripts', async t => {
   const { profile, state } = await fixture(t, { online: true });
   assert.equal((await runOperation(profile, 'status')).online, true);
@@ -159,6 +191,31 @@ test('errors retain server explanations without credentials, query tokens or cip
   });
 });
 
+test('server rejections map to actionable hints while keeping the original explanation', async t => {
+  const cases = [
+    ['用户名或者密码错误，请重新输入', /完整账号|自助服务平台/],
+    ['账号已达到同时在线上限', /下线其它设备/],
+    ['账号已欠费，请充值', /欠费|套餐/],
+    ['该账号不存在，请联系管理员', /未开通|绑定/],
+  ];
+  for (const [message, hint] of cases) {
+    const { profile } = await fixture(t, { loginResult: 'fail', message });
+    await assert.rejects(runOperation(profile, 'login', context), error => {
+      assert.equal(error.code, 'AUTH_REJECTED');
+      assert.match(error.message, hint);
+      assert.ok(error.message.includes('服务器提示：' + message));
+      for (const secret of [context.username, context.password]) assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+  }
+  const unknown = await fixture(t, { loginResult: 'fail', message: '未知的原因XYZ' });
+  await assert.rejects(runOperation(unknown.profile, 'login', context), error => {
+    assert.match(error.message, /锐捷认证被拒绝，请检查账号、密码和网络服务。/);
+    assert.ok(error.message.includes('服务器提示：未知的原因XYZ'));
+    return true;
+  });
+});
+
 test('literal script and meta-refresh navigation take precedence over a stale page pathname', async t => {
   const first = await fixture(t, { indexHtml: '<script>window.location.href="/eportal/success.jsp";</script>' });
   assert.equal((await runOperation(first.profile, 'status')).online, true);
@@ -166,6 +223,20 @@ test('literal script and meta-refresh navigation take precedence over a stale pa
   assert.equal((await runOperation(second.profile, 'status')).online, false);
   const third = await fixture(t, { homeHtml: `<a href="/eportal/success.jsp?userIndex=stale">普通历史链接</a>` });
   await assert.rejects(runOperation(third.profile, 'status'), { code: 'UNKNOWN_RESPONSE' });
+});
+
+test('same-path navigation follows new device parameters but ignores helper refreshes', async t => {
+  for (const redirect of [
+    `<script>window.location.href="/eportal/index.jsp?${rawQuery}";</script>`,
+    `<meta content="0; url=/eportal/index.jsp?${rawQuery}" http-equiv="refresh">`,
+  ]) {
+    const { profile, state } = await fixture(t, { firstTarget: '/eportal/index.jsp', indexHtml: redirect });
+    assert.equal((await runOperation(profile, 'status')).online, false);
+    assert.ok(state.calls.some(call => call.path === `/eportal/index.jsp?${rawQuery}`));
+  }
+  const refreshed = await fixture(t, { indexHtml: '<script>function refresh(){ window.location="./index.jsp"; }</script>' });
+  assert.equal((await runOperation(refreshed.profile, 'status')).online, false);
+  assert.equal(refreshed.state.calls.filter(call => call.path.startsWith('/eportal/index.jsp')).length, 1);
 });
 
 test('captcha is reported separately and stops automatic login loops in the service', async t => {
@@ -176,7 +247,7 @@ test('captcha is reported separately and stops automatic login loops in the serv
   const service = new CampusService({ directory, operation: async () => { throw new CampusError('请打开认证页完成验证码。', 'CAPTCHA_REQUIRED'); } });
   t.after(() => service.dispose());
   service.monitorArmed = true;
-  await service.connect({ username: 'fixture-account', password: 'fixture-password' }, { automatic: false });
+  await service.connect({ profileId: builtinRuijieProfile.id, username: 'fixture-account', password: 'fixture-password' }, { automatic: false });
   assert.equal(service.snapshot().connection.monitoring, false);
   assert.equal(service.reconnectContext, null);
 });

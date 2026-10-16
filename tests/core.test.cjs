@@ -131,21 +131,26 @@ test('timeouts and oversized response bodies fail with bounded safe errors', asy
 });
 
 function serviceFixture(t, operation = async () => ({ online: true, message: '已认证。' }), extra = {}) {
+  const { selectProfile = true, ...options } = extra;
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campus-link-test-'));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const storage = {
     isEncryptionAvailable: () => true,
     encryptString: value => Buffer.from([...value].reverse().join('')),
     decryptString: value => [...value.toString()].reverse().join(''),
   };
-  return new CampusService({ directory, safeStorage: storage, operation, ...extra });
+  const service = new CampusService({ directory, safeStorage: storage, operation, ...options });
+  t.after(() => { service.dispose(); fs.rmSync(directory, { recursive: true, force: true }); });
+  if (selectProfile) service.saveSettings({ profileId: builtinDrcomProfile.id });
+  return service;
 }
-test('remembered password is encrypted on disk and absent from snapshots and logs', async t => {
+test('remembered password is encrypted and absent from snapshots, disk plaintext and logs', async t => {
   const service = serviceFixture(t);
   const password = 'DoNotExpose-密码-7391';
   await service.connect({ username: 'student', password, rememberPassword: true });
   const disk = fs.readFileSync(service.file, 'utf8');
   assert.equal(disk.includes(password), false);
+  assert.equal(Object.hasOwn(JSON.parse(disk).credential, 'password'), false);
+  assert.equal(typeof JSON.parse(disk).credential.encrypted, 'string');
   assert.equal(JSON.stringify(service.snapshot()).includes(password), false);
   assert.equal(service.snapshot().hasPassword, true);
   assert.equal(service.decryptPassword(), password);
@@ -153,6 +158,95 @@ test('remembered password is encrypted on disk and absent from snapshots and log
   service.saveSettings({ rememberPassword: false });
   assert.equal(JSON.parse(fs.readFileSync(service.file, 'utf8')).credential, null);
   assert.equal(service.snapshot().hasPassword, false);
+});
+test('fresh installation stays unselected and performs no network work until a profile is chosen', async t => {
+  const calls = [];
+  const timers = [];
+  const service = serviceFixture(t, async (_profile, operation) => { calls.push(operation); return { online: false, message: 'offline' }; }, { selectProfile: false, setTimer: (...args) => { timers.push(args); return { unref() {} }; } });
+  assert.equal(service.settings.profileId, '');
+  assert.deepEqual(service.settings.parameters, {});
+  assert.match(service.connection.message, /连接方案/);
+  await service.initialize();
+  await service.checkStatus();
+  await service.refreshStatus();
+  await service.onNetworkChanged();
+  await service.autoConnectIfEnabled();
+  service.armMonitoring();
+  await service.monitorTick();
+  service.setGuardPaused(true);
+  service.setGuardPaused(false);
+  await assert.rejects(service.connect({ username: 'student', password: 'secret' }), /选择连接方案/);
+  await assert.rejects(service.disconnect(), /选择连接方案/);
+  assert.throws(() => service.setCredentials({ username: 'student', password: 'secret' }), /选择连接方案/);
+  assert.throws(() => service.saveSettings({ autoConnect: true }), /选择连接方案/);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(timers, []);
+  assert.equal(fs.existsSync(service.file), false);
+  service.saveSettings({ profileId: builtinDrcomProfile.id });
+  await service.initialize();
+  assert.deepEqual(calls, ['status']);
+});
+test('an explicitly empty selection persists and reloads without a school fallback', async t => {
+  const service = serviceFixture(t, async () => { throw new Error('No request expected'); }, { selectProfile: false });
+  service.saveSettings({ minimizeToTray: false });
+  const restored = new CampusService({ directory: service.directory, safeStorage: service.safeStorage, operation: service.operation });
+  t.after(() => restored.dispose());
+  assert.equal(restored.settings.profileId, '');
+  assert.deepEqual(restored.settings.parameters, {});
+  assert.equal(restored.settings.minimizeToTray, false);
+  assert.equal(restored.appInfo.firstRun, false);
+  await restored.initialize();
+  assert.equal(restored.monitorTimer, null);
+});
+test('an unavailable saved profile clears only the selection and preserves imported choices', async t => {
+  const service = serviceFixture(t);
+  service.importProfile(JSON.stringify(example));
+  const data = JSON.parse(fs.readFileSync(service.file));
+  data.settings.profileId = 'deleted-campus';
+  data.settings.username = 'existing-account';
+  data.settings.parameters = { stale: 'old-school' };
+  data.settings.autoConnect = true;
+  fs.writeFileSync(service.file, JSON.stringify(data));
+  const restored = new CampusService({ directory: service.directory, safeStorage: service.safeStorage });
+  t.after(() => restored.dispose());
+  assert.equal(restored.settings.profileId, '');
+  assert.deepEqual(restored.settings.parameters, {});
+  assert.equal(restored.settings.username, 'existing-account');
+  assert.equal(restored.settings.autoConnect, false);
+  assert.equal(restored.externalProfiles[0].id, example.id);
+});
+test('plaintext saved credentials are dropped and never reused for automatic login', async t => {
+  const calls = [];
+  const service = serviceFixture(t);
+  const data = JSON.parse(fs.readFileSync(service.file));
+  data.settings = { ...data.settings, username: 'legacy-account', rememberPassword: true, autoConnect: true };
+  data.credential = { profileId: data.settings.profileId, username: data.settings.username, password: 'insecure-password' };
+  fs.writeFileSync(service.file, JSON.stringify(data));
+  const restored = new CampusService({ directory: service.directory, safeStorage: service.safeStorage, operation: async (_profile, operation) => { calls.push(operation); return { online: false, message: 'offline' }; } });
+  t.after(() => restored.dispose());
+  assert.equal(restored.snapshot().hasPassword, false);
+  assert.equal(restored.decryptPassword(), '');
+  assert.equal(restored.settings.autoConnect, false);
+  await restored.initialize();
+  assert.deepEqual(calls, ['status']);
+  restored.saveSettings({ minimizeToTray: false });
+  assert.equal(fs.readFileSync(service.file, 'utf8').includes('insecure-password'), false);
+  assert.equal(JSON.parse(fs.readFileSync(service.file)).credential, null);
+});
+test('the encrypted password manager survives reload and basic_text storage is rejected', t => {
+  const service = serviceFixture(t);
+  service.setCredentials({ username: 'saved-account', password: 'saved-secret' });
+  service.saveSettings({ autoConnect: true });
+  const restored = new CampusService({ directory: service.directory, safeStorage: service.safeStorage });
+  t.after(() => restored.dispose());
+  assert.equal(restored.settings.profileId, builtinDrcomProfile.id);
+  assert.deepEqual(restored.settings.parameters, { operator: '1' });
+  assert.equal(restored.decryptPassword(), 'saved-secret');
+  assert.equal(restored.settings.autoConnect, true);
+  const unsafe = serviceFixture(t, undefined, { safeStorage: { isEncryptionAvailable: () => true, getSelectedStorageBackend: () => 'basic_text', encryptString: () => { throw new Error('must not encrypt'); } } });
+  assert.equal(unsafe.snapshot().app.secureStorage, false);
+  assert.throws(() => unsafe.setCredentials({ username: 'saved-account', password: 'saved-secret' }), /安全存储/);
+  assert.equal(unsafe.snapshot().hasPassword, false);
 });
 test('unremembered passwords and server error details never persist', async t => {
   const password = 'HiddenSecret123';
@@ -174,6 +268,50 @@ test('changing account removes old credentials and disables automatic connection
   assert.equal(service.snapshot().settings.autoConnect, false);
   await assert.rejects(service.connect({}), /密码/);
 });
+test('password manager encrypts credentials, enables automatic connection and validates input', async t => {
+  const service = serviceFixture(t);
+  const snapshot = service.setCredentials({ username: 'manager-account', password: 'manager-secret' });
+  assert.equal(snapshot.hasPassword, true);
+  assert.equal(snapshot.settings.username, 'manager-account');
+  assert.equal(snapshot.settings.rememberPassword, true);
+  const disk = fs.readFileSync(service.file, 'utf8');
+  assert.equal(disk.includes('manager-secret'), false);
+  assert.equal(Object.hasOwn(JSON.parse(disk).credential, 'password'), false);
+  assert.equal(service.decryptPassword(), 'manager-secret');
+  service.saveSettings({ autoConnect: true });
+  assert.equal(service.snapshot().settings.autoConnect, true);
+  assert.throws(() => service.setCredentials({ username: '', password: 'x' }), /账号/);
+  assert.throws(() => service.setCredentials({ username: 'ok', password: '' }), /密码/);
+  await service.connect({ username: 'manager-account', password: 'manager-secret' });
+  assert.throws(() => service.setCredentials({ username: 'other-account', password: 'x' }), /断开/);
+  await service.disconnect();
+});
+test('unreadable encrypted credentials disable automatic login and can be securely replaced', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campus-link-legacy-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const settings = { profileId: 'builtin-cdut-yibin-ruijie', username: 'legacy-account', rememberPassword: true, autoLaunch: false, autoConnect: true, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, parameters: {} };
+  fs.writeFileSync(path.join(directory, 'settings.json'), JSON.stringify({ version: 1, settings, profiles: [], credential: { profileId: settings.profileId, username: settings.username, encrypted: 'AAAA' } }));
+  const storage = { isEncryptionAvailable: () => true, encryptString: value => Buffer.from(value), decryptString: value => { if (value.toString('base64') === 'AAAA') throw new Error('cannot decrypt'); return value.toString(); } };
+  const service = new CampusService({ directory, safeStorage: storage, operation: async () => ({ online: true, message: 'ok' }) });
+  assert.equal(service.snapshot().hasPassword, true);
+  assert.equal(service.decryptPassword(), '');
+  assert.equal(service.settings.autoConnect, false);
+  assert.throws(() => service.saveSettings({ autoConnect: true }), /密码管理/);
+  const snapshot = service.setCredentials({ username: 'legacy-account', password: 'fresh-secret' });
+  assert.equal(snapshot.hasPassword, true);
+  assert.equal(service.decryptPassword(), 'fresh-secret');
+});
+test('first run flag tracks whether the settings file existed at startup', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campus-link-firstrun-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const storage = { isEncryptionAvailable: () => true, encryptString: value => Buffer.from([...value].reverse().join('')), decryptString: value => [...value.toString()].reverse().join('') };
+  const first = new CampusService({ directory, safeStorage: storage, operation: async () => ({ online: true, message: 'ok' }) });
+  assert.equal(first.snapshot().app.firstRun, true);
+  first.saveSettings({ profileId: builtinDrcomProfile.id });
+  first.setCredentials({ username: 'first-run-account', password: 'first-run-secret' });
+  const second = new CampusService({ directory, safeStorage: storage, operation: async () => ({ online: true, message: 'ok' }) });
+  assert.equal(second.snapshot().app.firstRun, false);
+});
 test('automatic authentication is opt-in, requires saved credentials and respects manual logout', async t => {
   const calls = [];
   const service = serviceFixture(t, async (_profile, operation) => { calls.push(operation); return { online: operation === 'login', message: 'ok' }; });
@@ -190,16 +328,16 @@ test('automatic authentication is opt-in, requires saved credentials and respect
 });
 test('explicit automatic connection requests fail clearly without valid remembered credentials', async t => {
   const service = serviceFixture(t);
-  assert.throws(() => service.saveSettings({ autoConnect: true }), /记住密码/);
+  assert.throws(() => service.saveSettings({ autoConnect: true }), /密码管理/);
   assert.equal(service.snapshot().settings.autoConnect, false);
   assert.equal(service.snapshot().settings.rememberPassword, false);
   service.saveSettings({ rememberPassword: true });
-  assert.throws(() => service.saveSettings({ autoConnect: true }), /记住密码/);
+  assert.throws(() => service.saveSettings({ autoConnect: true }), /密码管理/);
   await service.connect({ username: 'student', password: 'pw', rememberPassword: true });
   await service.disconnect();
-  assert.throws(() => service.saveSettings({ rememberPassword: false, autoConnect: true }), /记住密码/);
+  assert.throws(() => service.saveSettings({ rememberPassword: false, autoConnect: true }), /密码管理/);
   assert.equal(service.snapshot().hasPassword, true);
-  assert.throws(() => service.saveSettings({ username: 'other', autoConnect: true }), /记住密码/);
+  assert.throws(() => service.saveSettings({ username: 'other', autoConnect: true }), /密码管理/);
   assert.equal(service.snapshot().settings.username, 'student');
   service.saveSettings({ autoConnect: true });
   assert.equal(service.snapshot().settings.autoConnect, true);
@@ -221,6 +359,7 @@ test('concurrent actions are blocked and credentials clear disables auto connect
   assert.equal(service.snapshot().connection.status, 'connecting');
   await assert.rejects(service.disconnect(), /稍候/);
   assert.throws(() => service.saveSettings({ username: 'other' }), /稍候/);
+  assert.throws(() => service.setCredentials({ username: 'student', password: 'replacement' }), /稍候/);
   resolve({ online: true, message: 'ok' }); await pending;
   service.clearCredentials();
   assert.equal(service.snapshot().hasPassword, false);
@@ -235,11 +374,19 @@ test('import supports portable declarative profiles and protects built-in and du
   service.saveSettings({ profileId: example.id });
   assert.equal(service.snapshot().settings.parameters.operator, 'campus');
   service.removeProfile(example.id);
-  assert.equal(service.snapshot().settings.profileId, builtinProfile.id);
+  assert.equal(service.snapshot().settings.profileId, '');
+  assert.deepEqual(service.snapshot().settings.parameters, {});
 });
-test('unavailable secure storage prevents remembering and startup registration errors propagate', t => {
+test('saving credentials requires secure storage and startup registration errors propagate', async t => {
   const service = serviceFixture(t, undefined, { safeStorage: { isEncryptionAvailable: () => false }, autoLaunch: () => { throw new Error('开发预览不注册开机自启动'); } });
-  assert.throws(() => service.saveSettings({ rememberPassword: true }), /安全存储/);
+  service.saveSettings({ rememberPassword: true });
+  assert.equal(service.snapshot().settings.rememberPassword, true);
+  assert.equal(service.snapshot().hasPassword, false);
+  assert.throws(() => service.setCredentials({ username: 'student', password: 'secret' }), /安全存储/);
+  await assert.rejects(service.connect({ username: 'student', password: 'secret', rememberPassword: true }), /安全存储/);
+  assert.equal(service.snapshot().hasPassword, false);
+  await service.connect({ username: 'student', password: 'secret', rememberPassword: false });
+  assert.equal(service.connection.status, 'connected');
   assert.throws(() => service.saveSettings({ autoLaunch: true }), /开发预览/);
   assert.equal(service.snapshot().settings.autoLaunch, false);
 });
