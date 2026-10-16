@@ -14,7 +14,9 @@
 
 `schemaVersion` 固定为 `1`。共有必填字段为 `id`、`name`、`version`、`homepage`、`protocol`。`description`、`author`、`timeoutMs` 可选。`timeoutMs` 默认 10000，范围为 1000 至 30000。
 
-`http` 必须配置 `operations`，`fields` 可选。`ruijie` 必须配置 `ruijie` 及含 `service` 的 `fields`，不得设置 `operations`；`service` 须有非空默认值或非空选项。外部方案不能声明 `drcom`。
+`http` 必须配置 `operations`，`fields` 可选。`ruijie` 必须配置 `ruijie` 及含 `service` 的 `fields`，不得设置 `operations`；`service` 须有非空默认值或非空选项。`drcom` 使用应用内受控适配器，不得设置 `operations`；可以从现有 Dr.COM 方案卡片导出 JSON 后修改配置并重新导入。
+
+每张方案卡片都有“导出 JSON”按钮，导出完整的方案定义，不包含当前输入的账号密码或临时设备参数。内置方案会使用不带 `builtin-` 前缀的副本 ID，外部方案保留原 ID。完整导出和导入流程见 [方案指南](../docs/plugin-guide.md)。
 
 `homepage` 保存已知认证入口。HTTP 方案每个请求端点必须和它使用同一协议、主机及端口，且不跟随重定向。锐捷方案可优先从网络探测识别真实认证来源，未识别时回退 `homepage` / `ruijie.discoveryUrl`；认证只发送到识别出的 ePortal 或已知回退服务器。支持局域网 HTTP 和 HTTPS。校方只提供 HTTP 时，认证流量无法由本工具自动变成 HTTPS。
 

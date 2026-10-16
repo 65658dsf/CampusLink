@@ -6,6 +6,7 @@ node_modules/
 !.env.example
 test-results/
 /artifacts/
+output/
 /Page/
 
 # Local credentials, captured traffic, temporary data and packaged binaries.

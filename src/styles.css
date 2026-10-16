@@ -90,6 +90,37 @@
 .response-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:16px 27px;border-top:1px solid #e8efea;flex-shrink:0;background:#fbfcfb}
 .response-footer>[role=status]{margin-right:auto;font-size:10px;line-height:1.7;color:#739280}
 .response-dialog :focus-visible{outline:2px solid #299979;outline-offset:3px}
+.profile-actions{flex-wrap:wrap}
+.profile-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-left:auto}
+.profile-export{gap:6px}
+.update-notice{display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:20px;border:1px solid #d7eadd;border-radius:9px;background:#edf7f0;color:#4c8164;font-size:11px;line-height:1.8}
+.update-notice>span{min-width:0;overflow-wrap:anywhere}
+.update-notice>.text-button{margin-left:auto;white-space:nowrap}
+.update-check-row>div{min-width:0}
+.update-check-row>.button{flex-shrink:0}
+.update-checked-at{font-variant-numeric:tabular-nums}
+.update-error,.update-current{display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.8;padding:12px 14px;border-radius:7px;margin:0 0 17px;overflow-wrap:anywhere}
+.update-error{background:#fff7f2;border:1px solid #f2e1d5;color:#a4765e}
+.update-current{background:#f0f8f3;border:1px solid #e0ede4;color:#57836a}
+.update-error>svg,.update-current>svg{margin-top:2px}
+.update-available{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;margin:0 0 17px;border:1px solid #d9ebe0;border-radius:9px;background:#f0f8f3}
+.update-available>div:first-child{min-width:0}
+.update-available strong{font-size:12px;color:#427558;overflow-wrap:anywhere}
+.update-available p{font-size:10px;line-height:1.8;color:#708a79;margin-top:6px}
+.update-actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:8px;flex-shrink:0}
+.update-dialog{width:min(700px,calc(100vw - 48px))}
+.update-release-summary{margin:0 27px 19px;padding:17px;border:1px solid #deebe2;background:#f0f7f2;border-radius:9px;flex-shrink:0}
+.update-release-summary>p:first-child{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:16px;line-height:1.7;color:#7c9184;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.update-release-summary strong{font-weight:600;color:#218365}
+.update-release-summary>time{display:block;font-size:10px;line-height:1.8;color:#7c9283;margin-top:5px}
+.update-release-summary>p:last-child{font-size:11px;line-height:1.8;color:#63836e;margin-top:9px}
+.update-release-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 27px 22px}
+.update-release-content h3{font-size:12px;font-weight:600;color:#53755f;margin-bottom:10px}
+.update-notes{margin:0;padding:16px;border:1px solid #e8efea;border-radius:8px;background:#fafcfb;color:#536c5c;font:12px/1.9 Inter,"Segoe UI","Microsoft YaHei UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
+.update-dialog-footer{flex-wrap:wrap}
+.update-open-error{flex-basis:100%;font-size:11px;line-height:1.8;color:#b07565;overflow-wrap:anywhere}
+@media(max-width:900px){.update-available{align-items:flex-start;flex-direction:column}.update-actions{justify-content:flex-start}}
+@media(max-width:650px){.update-notice{flex-wrap:wrap;font-size:10px;gap:7px;padding:11px 12px}.update-notice>.text-button{margin-left:24px}.update-dialog{width:calc(100vw - 24px)}.update-release-summary{margin:0 17px 15px;padding:13px}.update-release-summary>p:first-child{font-size:14px}.update-release-content{padding:0 17px 17px}.update-notes{font-size:11px;padding:12px}.update-check-row{align-items:flex-start;flex-wrap:wrap}.update-actions{gap:7px;flex-shrink:1}.update-available{padding:13px}.profile-tools{gap:5px}.profile-export{padding-inline:8px}}
 @media(max-width:650px){.log-row{flex-wrap:wrap}.log-message{flex:1;min-width:120px}.log-actions{gap:5px}.log-response-button{font-size:9px}.response-dialog{width:calc(100vw - 24px);max-height:calc(100dvh - 24px);border-radius:12px}.response-heading{padding:18px 17px 13px}.response-heading h2{font-size:18px}.response-summary{margin:0 17px;padding:12px}.response-privacy{padding:11px 17px;font-size:9px}.response-requests{padding:0 17px 16px}.response-request{padding:12px}.response-metadata>div{font-size:10px;grid-template-columns:54px minmax(0,1fr);gap:7px}.response-footer{padding:13px 17px;gap:7px;flex-wrap:wrap}.response-footer>[role=status]:not(:empty){flex-basis:100%}.response-body{font-size:10px;max-height:200px}}
 .archived-profiles{margin-top:2px}
 .archived-toggle{display:inline-flex;align-items:center;gap:6px;margin:2px 0 10px}

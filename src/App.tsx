@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, EthernetPort, ExternalLink, Eye, EyeOff, FileJson2, GraduationCap, LayoutDashboard, LoaderCircle, LockKeyhole, Minus, Monitor, MoreHorizontal, Network, Power, Puzzle, Radio, RefreshCw, Settings2, ShieldCheck, Sparkles, Square, Terminal, Trash2, Upload, Wifi, X, FileText, KeyRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api, isPreview } from './api';
-import type { LogEntry, Profile, Settings, Snapshot } from './types';
+import type { LogEntry, Profile, Settings, Snapshot, UpdateState } from './types';
 import { journalEntries, maintainer, projectIntro, upstreamRepo, upstreamSite } from './journal';
 
 type Tab = 'overview' | 'profiles' | 'logs' | 'settings' | 'journal';
@@ -22,6 +22,9 @@ const portalOrigin = (value?: string) => {
   catch { return ''; }
 };
 const timeLabel = (value: string) => new Date(value).toLocaleTimeString('zh-CN', { hour12: false });
+const dateTimeLabel = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '';
+const errorMessage = (error: unknown) => error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(error);
+const updateLabels = { idle: '尚未检查', checking: '正在检查', 'up-to-date': '已是最新版本', available: '发现新版本', error: '检查未完成' };
 
 function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean; label: string }) {
   return <button className={`toggle ${checked ? 'on' : ''}`} type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)}><span /></button>;
@@ -85,6 +88,35 @@ function ResponseDialog({ entry, onClose }: { entry: LogEntry; onClose: () => vo
   </dialog>;
 }
 
+function UpdateDialog({ release, onClose }: { release: UpdateState; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState('');
+  const publishedAt = dateTimeLabel(release.publishedAt);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+    return () => { dialog?.close(); if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, []);
+
+  async function download() {
+    if (opening) return;
+    setOpening(true); setOpenError('');
+    try { await api.openRelease(); }
+    catch (error) { setOpenError(errorMessage(error)); }
+    finally { setOpening(false); }
+  }
+
+  return <dialog ref={dialogRef} className="response-dialog update-dialog" aria-modal="true" aria-labelledby="update-dialog-title" aria-describedby="update-dialog-summary" onCancel={event => { event.preventDefault(); onClose(); }}>
+    <header className="response-heading"><div><span className="eyebrow">CAMPUS LINK UPDATE</span><h2 id="update-dialog-title">岚连有新版本了</h2></div><button type="button" autoFocus className="icon-button" aria-label="关闭更新内容" onClick={onClose}><X size={20} /></button></header>
+    <div className="update-release-summary"><p id="update-dialog-summary">v{release.currentVersion}<ArrowRight size={17} aria-label="更新至" /><strong>v{release.latestVersion}</strong></p>{publishedAt && <time dateTime={release.publishedAt}>发布于 {publishedAt}</time>}<p>前往 GitHub Releases 下载新版本，安装后即可使用。</p></div>
+    <section className="update-release-content" aria-labelledby="update-notes-title"><h3 id="update-notes-title">更新内容</h3><pre className="update-notes" tabIndex={0}>{release.notes?.trim() || '此版本未提供更新说明，可前往 Releases 查看版本信息。'}</pre></section>
+    <footer className="response-footer update-dialog-footer">{openError && <p className="update-open-error" role="alert">{openError}</p>}<button type="button" className="button secondary small" onClick={onClose}>稍后再说</button><button type="button" className="button primary small" disabled={opening} onClick={() => void download()}>{opening ? <LoaderCircle size={15} className="spin" /> : <ArrowDownToLine size={15} />}前往 Releases 下载<ExternalLink size={13} /></button></footer>
+  </dialog>;
+}
+
 export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
@@ -112,6 +144,12 @@ export default function App() {
   const [welcomePassword, setWelcomePassword] = useState('');
   const [welcomeShowPassword, setWelcomeShowPassword] = useState(false);
   const [welcomeInterval, setWelcomeInterval] = useState('10');
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [releaseDialog, setReleaseDialog] = useState<UpdateState | null>(null);
+  const announcedVersions = useRef(new Set<string>());
+  const checkUpdatePending = useRef(false);
+  const exportPending = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -126,6 +164,20 @@ export default function App() {
   }, []);
   useEffect(() => { if (toast) { const timer = setTimeout(() => setToast(null), 6500); return () => clearTimeout(timer); } }, [toast]);
   useEffect(() => {
+    let active = true;
+    let receivedEvent = false;
+    const unsubscribe = api.onUpdate(value => { receivedEvent = true; if (active) setUpdateState(value); });
+    api.getUpdateState().then(value => { if (active && !receivedEvent) setUpdateState(value); }).catch(error => {
+      if (active && !receivedEvent) setUpdateState({ status: 'error', currentVersion: '', message: errorMessage(error) });
+    });
+    return () => { active = false; unsubscribe(); };
+  }, []);
+  useEffect(() => {
+    if (!snapshot || inspectedLog || help || removeId || releaseDialog || updateState?.status !== 'available' || !updateState.latestVersion || announcedVersions.current.has(updateState.latestVersion)) return;
+    announcedVersions.current.add(updateState.latestVersion);
+    setReleaseDialog(updateState);
+  }, [snapshot, updateState, inspectedLog, help, removeId, releaseDialog]);
+  useEffect(() => {
     if (snapshot) { setReconnectInterval(String(snapshot.settings.reconnectIntervalSeconds)); setIntervalError(''); }
   }, [snapshot?.settings.reconnectIntervalSeconds]);
   useEffect(() => {
@@ -135,7 +187,7 @@ export default function App() {
   async function action<T>(work: () => Promise<T>, success?: string): Promise<T | undefined> {
     setBusy(true);
     try { const result = await work(); if (success) setToast({ message: success, error: false }); return result; }
-    catch (error) { setToast({ message: error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(error), error: true }); }
+    catch (error) { setToast({ message: errorMessage(error), error: true }); }
     finally { setBusy(false); }
   }
   async function updateSettings(patch: Partial<Settings>) {
@@ -205,13 +257,28 @@ export default function App() {
     const result = await action(() => api.exportExample(kind));
     if (result && !result.canceled) setToast({ message: `示例已保存${result.path ? `：${result.path}` : ''}`, error: false });
   }
+  async function exportProfile(id: string) {
+    if (exportPending.current || busy) return;
+    exportPending.current = true;
+    try {
+      const result = await action(() => api.exportProfile(id));
+      if (result && !result.canceled) setToast({ message: `连接方案已保存${result.path ? `：${result.path}` : '。'}`, error: false });
+    } finally { exportPending.current = false; }
+  }
+  async function checkForUpdates() {
+    if (checkUpdatePending.current || updateState?.status === 'checking') return;
+    checkUpdatePending.current = true; setCheckingUpdate(true);
+    try { setUpdateState(await api.checkForUpdates()); }
+    catch (error) { setUpdateState({ status: 'error', currentVersion: snapshot?.app.version ?? '', message: errorMessage(error) }); }
+    finally { checkUpdatePending.current = false; setCheckingUpdate(false); }
+  }
 
   if (!snapshot) return <div className="loading-screen"><div className="brand-icon"><Wifi /></div><h2>岚连 · CDUTYB 专版</h2><p>{toast?.message ?? '正在准备你的校园连接…'}</p>{!toast && <LoaderCircle className="spin" />}</div>;
   const visibleProfiles = snapshot.profiles.filter(item => !item.archived);
   const archivedProfiles = snapshot.profiles.filter(item => item.archived);
   const selectProfiles = [...visibleProfiles, ...archivedProfiles.filter(item => item.id === profileId)];
   const profile = snapshot.profiles.find(item => item.id === profileId) ?? visibleProfiles[0] ?? snapshot.profiles[0];
-  const renderProfileCard = (item: Profile) => (<article className={`card profile-card ${item.id === profileId ? 'selected' : ''}`} key={item.id}><div className="profile-card-header"><span className="profile-emblem"><GraduationCap size={26} /></span><span className={`badge ${item.builtin ? 'subtle' : 'neutral'}`}>{item.builtin ? '应用内置' : '外部导入'}</span></div><h2>{item.name}</h2><p className="profile-description">{item.description}</p><dl className="profile-details"><div><dt>认证协议</dt><dd>{protocolLabel(item.protocol)}</dd></div><div><dt>方案版本</dt><dd>v{item.version}</dd></div><div><dt>认证入口</dt><dd title={item.portalDiscovery?.url ?? item.homepage}>{item.portalDiscovery ? '自动发现' : item.homepage}</dd></div>{item.portalDiscovery && <><div><dt>发现地址</dt><dd title={item.portalDiscovery.url}>{item.portalDiscovery.url}</dd></div><div><dt>备用认证页</dt><dd title={item.homepage}>{item.homepage}</dd></div></>}</dl><div className="profile-actions"><button className={`button small ${item.id === profileId ? 'selected-button' : 'secondary'}`} disabled={inProgress || canDisconnect || item.id === profileId} onClick={() => void selectProfile(item.id)}>{item.id === profileId ? <><CheckCheck size={16} />当前使用</> : '使用此方案'}</button><button className="icon-button" title="打开认证页" aria-label={`打开${item.name}认证页`} onClick={() => void action(() => api.openPortal(item.id))}><ExternalLink size={17} /></button>{!item.builtin && <button className="icon-button danger-icon" disabled={inProgress || canDisconnect} title="删除方案" aria-label={`删除${item.name}方案`} onClick={() => setRemoveId(item.id)}><Trash2 size={17} /></button>}</div></article>);
+  const renderProfileCard = (item: Profile) => (<article className={`card profile-card ${item.id === profileId ? 'selected' : ''}`} key={item.id}><div className="profile-card-header"><span className="profile-emblem"><GraduationCap size={26} /></span><span className={`badge ${item.builtin ? 'subtle' : 'neutral'}`}>{item.builtin ? '应用内置' : '外部导入'}</span></div><h2>{item.name}</h2><p className="profile-description">{item.description}</p><dl className="profile-details"><div><dt>认证协议</dt><dd>{protocolLabel(item.protocol)}</dd></div><div><dt>方案版本</dt><dd>v{item.version}</dd></div><div><dt>认证入口</dt><dd title={item.portalDiscovery?.url ?? item.homepage}>{item.portalDiscovery ? '自动发现' : item.homepage}</dd></div>{item.portalDiscovery && <><div><dt>发现地址</dt><dd title={item.portalDiscovery.url}>{item.portalDiscovery.url}</dd></div><div><dt>备用认证页</dt><dd title={item.homepage}>{item.homepage}</dd></div></>}</dl><div className="profile-actions"><button className={`button small ${item.id === profileId ? 'selected-button' : 'secondary'}`} disabled={inProgress || canDisconnect || item.id === profileId} onClick={() => void selectProfile(item.id)}>{item.id === profileId ? <><CheckCheck size={16} />当前使用</> : '使用此方案'}</button><div className="profile-tools"><button type="button" className="button secondary small profile-export" title={`导出${item.name}方案 JSON`} aria-label={`导出${item.name}方案 JSON`} disabled={busy} onClick={() => void exportProfile(item.id)}><ArrowDownToLine size={14} />导出 JSON</button><button className="icon-button" title="打开认证页" aria-label={`打开${item.name}认证页`} onClick={() => void action(() => api.openPortal(item.id))}><ExternalLink size={17} /></button>{!item.builtin && <button className="icon-button danger-icon" disabled={inProgress || canDisconnect} title="删除方案" aria-label={`删除${item.name}方案`} onClick={() => setRemoveId(item.id)}><Trash2 size={17} /></button>}</div></div></article>);
   const state = snapshot.connection.status;
   const connected = state === 'connected';
   const detectedPortalOrigin = portalOrigin(snapshot.connection.portalUrl);
@@ -246,6 +313,8 @@ export default function App() {
         <div className="page-heading"><div><div className="eyebrow">{tab === 'overview' ? 'STAY CONNECTED. STAY INSPIRED.' : tab === 'profiles' ? 'A CONNECTION FOR EVERY CAMPUS.' : tab === 'logs' ? 'EVERY CONNECTION, IN SIGHT.' : tab === 'journal' ? 'THE JOURNEY SO FAR.' : 'MAKE YOURSELF AT HOME.'}</div><h1>{tab === 'overview' ? '校园生活，即刻在线' : activeTab.label}<span className="heading-dot">.</span></h1><p>{tab === 'overview' ? '让连接更轻松，把时间留给热爱的事。' : tab === 'profiles' ? '一份轻巧的配置，连接更多校园。' : tab === 'logs' ? '查看认证与应用事件，快速定位连接问题。' : tab === 'journal' ? '版本记录、上游介绍与授权署名。' : '按你的习惯，安排每一次连接。'}</p></div><div className="heading-actions">{tab === 'overview' ? <button className="button secondary small" disabled={inProgress} onClick={() => void action(async () => setSnapshot(await api.checkStatus()))}><RefreshCw size={15} className={state === 'checking' || snapshot.connection.refreshing ? 'spin' : ''} />检测网络</button> : tab === 'profiles' ? <button className="button primary small" disabled={inProgress} onClick={() => void importProfile()}><Upload size={16} />导入连接方案</button> : <span className="heading-symbol"><activeTab.icon size={25} strokeWidth={1.5} /></span>}</div></div>
 
         {isPreview && <div className="preview-notice"><Monitor size={15} /><span>正在预览界面 · 网络认证、密码保存与开机自启动请在桌面客户端中使用。</span></div>}
+
+        {updateState?.status === 'available' && <div className="update-notice" role="status"><Sparkles size={17} /><span>新版本 <strong>v{updateState.latestVersion}</strong> 已发布</span><button type="button" className="text-button" onClick={() => setReleaseDialog(updateState)}>查看更新内容<ArrowRight size={14} /></button></div>}
 
         {tab === 'overview' && <>
           <section className={`connection-banner ${connected ? 'connected' : ''}`} aria-label="网络状态">
@@ -323,13 +392,21 @@ export default function App() {
               <div className="interval-editor"><div className="interval-controls"><input id="reconnect-interval" type="number" inputMode="numeric" min={5} max={3600} step={1} value={reconnectInterval} disabled={inProgress} aria-invalid={Boolean(intervalError)} aria-describedby={intervalError ? 'reconnect-interval-help reconnect-interval-error' : 'reconnect-interval-help'} onChange={event => { setReconnectInterval(event.target.value); setIntervalError(''); }} /><button className="button secondary small" type="submit" disabled={inProgress || reconnectInterval === String(snapshot.settings.reconnectIntervalSeconds)}>保存间隔</button></div>{intervalError && <p className="field-error" id="reconnect-interval-error" role="alert">{intervalError}</p>}</div>
             </form>
             <div className={`guard-status ${guardActive ? 'active' : guardPaused ? 'paused' : ''}`}><ShieldCheck size={16} /><p>{guardSummary}<span>手动注销或托盘暂停都会停止守护；再次连接成功或“恢复守护”后继续。服务器暂不可达时不会把状态未知当作断线。</span></p></div>
-          </section><section className="card settings-card"><div className="card-heading"><div className="section-title"><span className="icon-tile"><LockKeyhole size={20} /></span><div><h2>账号与隐私</h2><p>凭据由你掌控</p></div></div><span className="badge neutral">明文存储</span></div><div className="settings-row"><div><strong>本地保存的密码</strong><p>{snapshot.hasPassword ? `已明文保存在本机（便于自动连接）${snapshot.settings.username ? `：${snapshot.settings.username}` : ''}。清除后，自动连接也会关闭。` : '暂未保存密码：可在连接页勾选「记住密码」，或点击「管理账号密码」直接设置。'}</p></div><div style={{ display: 'flex', gap: 8, flexShrink: 0 }}><button className="button primary small" disabled={busy} onClick={openManager}><KeyRound size={14} />管理账号密码</button><button className="button secondary small" disabled={inProgress || !snapshot.hasPassword} onClick={() => void action(async () => { const value = await api.clearCredentials(); setSnapshot(value); setPassword(''); setRemember(false); }, '本地密码已清除，自动连接已关闭。')}><Trash2 size={14} />清除密码</button></div></div></section><section className="about-card"><div className="brand-icon"><Wifi size={28} /></div><div><h2>岚连 · CDUTYB 专版</h2><p>面向成都理工大学（宜宾校区）的校园网连接工具 · v{snapshot.app.version}</p><p className="about-detail">{snapshot.app.packaged ? `${platformName} 安装版` : isPreview ? '浏览器预览' : '开发模式'} · 基于 NingMeng123 的 Campus Link 构建 · 独立辅助工具</p></div><button className="text-button" onClick={() => setHelp(true)}>使用帮助<ArrowRight size={15} /></button></section></div>}
+          </section><section className="card settings-card"><div className="card-heading"><div className="section-title"><span className="icon-tile"><LockKeyhole size={20} /></span><div><h2>账号与隐私</h2><p>凭据由你掌控</p></div></div><span className="badge neutral">明文存储</span></div><div className="settings-row"><div><strong>本地保存的密码</strong><p>{snapshot.hasPassword ? `已明文保存在本机（便于自动连接）${snapshot.settings.username ? `：${snapshot.settings.username}` : ''}。清除后，自动连接也会关闭。` : '暂未保存密码：可在连接页勾选「记住密码」，或点击「管理账号密码」直接设置。'}</p></div><div style={{ display: 'flex', gap: 8, flexShrink: 0 }}><button className="button primary small" disabled={busy} onClick={openManager}><KeyRound size={14} />管理账号密码</button><button className="button secondary small" disabled={inProgress || !snapshot.hasPassword} onClick={() => void action(async () => { const value = await api.clearCredentials(); setSnapshot(value); setPassword(''); setRemember(false); }, '本地密码已清除，自动连接已关闭。')}><Trash2 size={14} />清除密码</button></div></div></section>
+          <section className="card settings-card update-card" aria-labelledby="update-card-title">
+            <div className="card-heading"><div className="section-title"><span className="icon-tile"><ArrowDownToLine size={20} /></span><div><h2 id="update-card-title">软件更新</h2><p>获取新功能与修复，保持岚连常新</p></div></div><span className={`badge ${updateState?.status === 'available' ? 'subtle' : 'neutral'}`} role="status">{checkingUpdate ? '正在检查' : updateLabels[updateState?.status ?? 'idle']}</span></div>
+            <div className="settings-row update-check-row"><div><strong>当前版本 v{snapshot.app.version}</strong><p>{isPreview ? '更新检查请使用桌面客户端。' : '应用启动时自动检查正式版本，也可以手动检查。'}</p>{updateState?.checkedAt && dateTimeLabel(updateState.checkedAt) && <p className="update-checked-at">上次检查：<time dateTime={updateState.checkedAt}>{dateTimeLabel(updateState.checkedAt)}</time></p>}</div><button type="button" className="button secondary small" disabled={checkingUpdate || updateState?.status === 'checking'} onClick={() => void checkForUpdates()}><RefreshCw size={14} className={checkingUpdate || updateState?.status === 'checking' ? 'spin' : ''} />{checkingUpdate || updateState?.status === 'checking' ? '正在检查…' : '检查更新'}</button></div>
+            {updateState?.status === 'error' && <p className="update-error" role="status"><CircleHelp size={15} />{updateState.message || '暂时无法检查更新，请稍后重试。'}</p>}
+            {updateState?.status === 'up-to-date' && <p className="update-current" role="status"><CheckCheck size={15} />当前已是最新正式版本。</p>}
+            {updateState?.status === 'available' && <div className="update-available"><div><strong>新版本 v{updateState.latestVersion} 已就绪</strong><p>查看更新内容后，前往 Releases 下载对应系统的安装包。</p></div><div className="update-actions"><button type="button" className="button secondary small" onClick={() => setReleaseDialog(updateState)}>查看更新内容</button><button type="button" className="button primary small" disabled={busy} onClick={() => void action(() => api.openRelease())}>前往 Releases 下载<ExternalLink size={13} /></button></div></div>}
+          </section><section className="about-card"><div className="brand-icon"><Wifi size={28} /></div><div><h2>岚连 · CDUTYB 专版</h2><p>面向成都理工大学（宜宾校区）的校园网连接工具 · v{snapshot.app.version}</p><p className="about-detail">{snapshot.app.packaged ? `${platformName} 安装版` : isPreview ? '浏览器预览' : '开发模式'} · 基于 NingMeng123 的 Campus Link 构建 · 独立辅助工具</p></div><button className="text-button" onClick={() => setHelp(true)}>使用帮助<ArrowRight size={15} /></button></section></div>}
 
         <footer className="page-footer"><span><span className="footer-mark">⌁</span> 简单连接，自在校园。</span><span>MADE FOR YOUR CAMPUS <span className="footer-dot">✦</span></span></footer>
       </main>
     </div>
 
     {toast && <div className={`toast ${toast.error ? 'error' : ''}`} role="alert">{toast.error ? <CircleHelp size={19} /> : <Check size={19} />}<span>{toast.message}</span><button aria-label="关闭提示" onClick={() => setToast(null)}><X size={16} /></button></div>}
+    {releaseDialog && <UpdateDialog release={releaseDialog} onClose={() => setReleaseDialog(null)} />}
     {inspectedLog && <ResponseDialog entry={inspectedLog} onClose={() => setInspectedLog(null)} />}
     {help && <div className="modal-backdrop" onClick={() => setHelp(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={event => event.stopPropagation()}><button className="modal-close icon-button" aria-label="关闭帮助" onClick={() => setHelp(false)}><X size={19} /></button><span className="icon-tile large"><Wifi size={27} /></span><h2 id="help-title">三步，回到校园在线生活</h2><div className="help-step"><b>1</b><div><strong>接入学校网络</strong><p>先在系统中连接校园 Wi-Fi 或插入校园网网线。本工具负责校园网认证。</p></div></div><div className="help-step"><b>2</b><div><strong>选择方案并填写账号</strong><p>启动后会自动检查登录状态。已登录时直接显示在线信息；未登录时，选择学校并填写认证账号密码。</p></div></div><div className="help-step"><b>3</b><div><strong>连接，或按需自动连接</strong><p>点击连接完成认证。勾选记住密码后可开启启动自动连接；开机自启动需要安装桌面版本。</p></div></div><div className="help-note"><Network size={18} /><p>连接失败时查看活动日志。账号欠费、设备限制等问题请通过学校认证页或校园网服务渠道处理。</p></div><button className="button primary" onClick={() => setHelp(false)}>开始使用<ArrowRight size={16} /></button></section></div>}
     {removeId && <div className="modal-backdrop"><section className="modal small-modal" role="dialog" aria-modal="true" aria-labelledby="remove-title"><h2 id="remove-title">移除这个连接方案？</h2><p>配置将从本机移除，之后可以重新导入。</p><div className="modal-actions"><button className="button secondary" onClick={() => setRemoveId(null)}>取消</button><button className="button danger" disabled={busy} onClick={() => void action(async () => { const value = await api.removeProfile(removeId); setSnapshot(value); setProfileId(value.settings.profileId); setParameters(value.settings.parameters); setUsername(value.settings.username); setRemember(value.settings.rememberPassword); setPassword(''); setRemoveId(null); }, '连接方案已移除。')}>确认移除</button></div></section></div>}
