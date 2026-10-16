@@ -23,6 +23,7 @@ export const api: CampusAPI = window.campus ?? {
   importProfile: desktopOnly,
   removeProfile: desktopOnly,
   exportExample: desktopOnly,
+  exportDiagnostics: desktopOnly,
   openPortal: desktopOnly,
   clearCredentials: desktopOnly,
   windowAction: async () => {},

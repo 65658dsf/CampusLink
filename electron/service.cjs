@@ -304,6 +304,16 @@ class CampusService extends EventEmitter {
     if (this.disposed || !this.settings.autoReconnect || this.reconnectPaused || this.busy || this.now() - this.lastStatusCheck < 5000) return this.snapshot();
     return this.checkStatus({ silent: true });
   }
+  async onNetworkChanged() {
+    // Called by the interface watcher when the active network changed, for
+    // example because campus Wi-Fi was just joined. Unlike a focus refresh
+    // this follows a real state change, so it may bypass the five second read
+    // throttle; the busy guard still serializes it with explicit user actions.
+    if (this.disposed || this.busy) return this.snapshot();
+    if (this.monitoring()) return this.monitorTick();
+    if (!this.settings.autoReconnect || this.reconnectPaused) return this.snapshot();
+    return this.checkStatus({ silent: true });
+  }
   importProfile(text) {
     this.assertIdle();
     const profile = parseProfile(text);

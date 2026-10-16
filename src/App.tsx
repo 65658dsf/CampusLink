@@ -245,6 +245,10 @@ export default function App() {
           { key: 'autoConnect' as const, title: '启动后自动连接', description: '需先成功保存账号密码；启动时先检测认证状态。' },
           { key: 'minimizeToTray' as const, title: '关闭时最小化到托盘', description: '点击关闭按钮后在后台保留，可从系统托盘退出。' },
         ].map(item => <div className="settings-row" key={item.key}><div><strong>{item.title}</strong><p>{item.description}</p></div><Toggle label={item.title} checked={snapshot.settings[item.key]} disabled={inProgress} onChange={value => void updateSettings({ [item.key]: value })} /></div>)}</section>
+          <section className="card settings-card" aria-labelledby="diagnostics-title">
+            <div className="card-heading"><div className="section-title"><span className="icon-tile"><ArrowDownToLine size={20} /></span><div><h2 id="diagnostics-title">诊断与帮助</h2><p>远程排障用的脱敏信息</p></div></div></div>
+            <div className="settings-row"><div><strong>导出诊断包</strong><p>包含应用信息、网络概况与本次运行的脱敏日志，不含密码，可放心发给协助排查的人。</p></div><button className="button secondary small" disabled={inProgress} onClick={() => void action(async () => { const result = await api.exportDiagnostics(); if (!result.canceled) setToast({ message: '诊断包已导出。', error: false }); })}><ArrowDownToLine size={14} />导出诊断包</button></div>
+          </section>
           <section className="card settings-card guard-card" aria-labelledby="guard-title">
             <div className="card-heading"><div className="section-title"><span className="icon-tile"><Radio size={20} /></span><div><h2 id="guard-title">网络守护</h2><p>成功连接后定期检查，确认断线时尝试恢复</p></div></div><span className={`badge ${guardActive ? 'subtle' : 'neutral'}`}>{guardLabel}</span></div>
             <div className="settings-row"><div><strong>断线自动重连</strong><p>使用本次连接的认证信息或已保存密码；无可用凭据时提示手动连接。</p></div><Toggle label="断线自动重连" checked={snapshot.settings.autoReconnect} disabled={inProgress} onChange={value => void updateSettings({ autoReconnect: value })} /></div>

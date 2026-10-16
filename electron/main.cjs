@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { CampusService } = require('./service.cjs');
 const { MAX_PROFILE_BYTES, safeUrl, parseProfile } = require('./profiles.cjs');
+const { buildDiagnosticsReport } = require('./diagnostics-export.cjs');
+const { createNetworkWatcher } = require('./network-watch.cjs');
 
 app.setName('岚连 · Campus Link');
 app.setAppUserModelId('cn.campuslink.desktop');
@@ -14,6 +16,7 @@ const isPrimary = app.requestSingleInstanceLock();
 let win = null;
 let tray = null;
 let service = null;
+let networkWatcher = null;
 let quitting = false;
 const indexPath = path.resolve(__dirname, '../dist/index.html');
 const indexUrl = pathToFileURL(indexPath).href;
@@ -80,6 +83,15 @@ function registerIpc() {
     if (result.canceled || !result.filePath) return { canceled: true };
     fs.copyFileSync(path.join(__dirname, '../examples', filename), result.filePath);
     service.log('success', '连接方案示例已保存。');
+    return { canceled: false, path: result.filePath };
+  });
+  handle('exportDiagnostics', async () => {
+    const report = buildDiagnosticsReport(service.snapshot());
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const result = await dialog.showSaveDialog(win, { title: '导出诊断包', defaultPath: `campuslink-diagnostics-${stamp}.json`, filters: [{ name: '诊断包 JSON', extensions: ['json'] }] });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    fs.writeFileSync(result.filePath, report);
+    service.log('success', '诊断包已导出。');
     return { canceled: false, path: result.filePath };
   });
   handle('openPortal', async id => {
@@ -160,7 +172,7 @@ function createWindow() {
 if (!isPrimary) app.quit();
 else {
   app.on('second-instance', showWindow);
-  app.on('before-quit', () => { quitting = true; service?.dispose(); });
+  app.on('before-quit', () => { quitting = true; networkWatcher?.stop(); service?.dispose(); });
   app.on('window-all-closed', () => { if (!tray || quitting) app.quit(); });
   app.on('activate', showWindow);
   app.whenReady().then(() => {
@@ -185,6 +197,8 @@ else {
     tray.on('double-click', showWindow);
     service.on('snapshot', snapshot => { if (win && !win.isDestroyed()) win.webContents.send('campus:snapshot', snapshot); updateTray(snapshot); });
     updateTray(service.snapshot());
+    networkWatcher = createNetworkWatcher({ onChange: () => { void service.onNetworkChanged().catch(() => {}); } });
+    networkWatcher.start();
     void service.initialize().catch(() => service.log('warning', '启动状态检查未完成，请点击检测网络重试。'));
     powerMonitor.on('resume', () => { void service.refreshStatus().catch(() => {}); });
   }).catch(() => {

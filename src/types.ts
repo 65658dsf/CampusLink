@@ -16,6 +16,7 @@ export interface CampusAPI {
   importProfile(): Promise<{ canceled: boolean; snapshot: Snapshot }>;
   removeProfile(id: string): Promise<Snapshot>;
   exportExample(kind?: 'http' | 'ruijie'): Promise<{ canceled: boolean; path?: string }>;
+  exportDiagnostics(): Promise<{ canceled: boolean; path?: string }>;
   openPortal(profileId: string): Promise<void>;
   clearCredentials(): Promise<Snapshot>;
   windowAction(action: 'minimize' | 'maximize' | 'close'): Promise<void>;

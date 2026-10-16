@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('campus', Object.freeze({
   importProfile: invoke('importProfile'),
   removeProfile: invoke('removeProfile'),
   exportExample: invoke('exportExample'),
+  exportDiagnostics: invoke('exportDiagnostics'),
   openPortal: invoke('openPortal'),
   clearCredentials: invoke('clearCredentials'),
   windowAction: invoke('windowAction'),
