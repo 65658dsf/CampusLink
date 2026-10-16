@@ -45,6 +45,14 @@ const http = require('node:http');
   const app = await electron.launch({ args: [root], cwd: root, env });
   try {
     const page = await app.firstWindow();
+    const nativeClipboardAvailable = await app.evaluate(({ clipboard }) => {
+      const previous = clipboard.readText();
+      const marker = 'CampusLink desktop clipboard availability check';
+      clipboard.writeText(marker);
+      const available = clipboard.readText() === marker;
+      if (available) clipboard.writeText(previous);
+      return available;
+    });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await expect(page.getByRole('heading', { name: '校园生活，即刻在线.' })).toBeVisible();
@@ -93,6 +101,21 @@ const http = require('node:http');
     await page.getByRole('button', { name: '导出锐捷示例', exact: true }).click();
     await expect.poll(() => JSON.parse(fs.readFileSync(exportPath, 'utf8')).protocol).toBe('ruijie');
     assert.deepEqual(JSON.parse(fs.readFileSync(exportPath, 'utf8')), JSON.parse(fs.readFileSync(path.join(root, 'examples/ruijie-campus.example.json'), 'utf8')));
+    // Per-card exports must be actual, re-importable definitions, not examples
+    // or public snapshots that omit protocol configuration.
+    for (const [name, protocol] of [['四川大学 · 锐捷 ePortal', 'ruijie'], ['贵州轻工职业大学', 'drcom']]) {
+      await page.getByRole('button', { name: `导出${name}方案 JSON`, exact: true }).click();
+      await expect.poll(() => JSON.parse(fs.readFileSync(exportPath, 'utf8')).protocol).toBe(protocol);
+      const exported = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
+      assert.equal(exported.id.startsWith('builtin-'), false);
+      assert.deepEqual(require('../electron/profiles.cjs').parseProfile(JSON.stringify(exported)), exported);
+      if (protocol === 'ruijie') assert.ok(exported.ruijie.publicKey.modulus);
+    }
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, exportPath);
+    await page.getByRole('button', { name: '导入连接方案', exact: true }).click();
+    await expect.poll(async () => (await page.evaluate(() => window.campus.getSnapshot())).profiles.some(p => p.id === 'gzqy-copy')).toBe(true);
+    await page.evaluate(() => window.campus.removeProfile('gzqy-copy'));
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, fixturePath);
     await page.getByRole('button', { name: '导入连接方案', exact: true }).click();
     await expect(page.getByRole('heading', { name: fixture.name, exact: true })).toBeVisible();
     await page.locator('article').filter({ has: page.getByRole('heading', { name: fixture.name, exact: true }) }).getByRole('button', { name: '使用此方案', exact: true }).click();
@@ -110,11 +133,22 @@ const http = require('node:http');
     await expect(responseDialog).not.toContainText('local-smoke-account');
     assert.equal(await page.evaluate(() => window.responseExecuted), undefined);
     await page.screenshot({ path: path.join(root, 'artifacts/response-details.png') });
-    await page.getByRole('button', { name: '复制详情', exact: true }).click();
-    await expect(responseDialog).toContainText('已复制');
-    const clipboard = await app.evaluate(({ clipboard }) => clipboard.readText());
-    assert.ok(clipboard.includes('Bad request(2)'));
-    assert.equal(clipboard.includes('local-smoke-secret'), false);
+    await app.evaluate(({ clipboard }) => {
+      const originalWrite = clipboard.writeText.bind(clipboard);
+      clipboard.writeText = (...args) => { global.__smokeClipboardWrite = args[0]; return originalWrite(...args); };
+    });
+    // The OS clipboard is shared with other desktop apps. Retry the complete
+    // copy/read interaction if its contents change before we can observe it.
+    await expect(async () => {
+      await page.getByRole('button', { name: '复制详情', exact: true }).click();
+      await expect(responseDialog).toContainText('已复制');
+      const clipboard = await app.evaluate(({ clipboard }) => clipboard.readText());
+      const bridgeWrite = await app.evaluate(() => global.__smokeClipboardWrite || '');
+      assert.ok(bridgeWrite.includes('Bad request(2)'), 'The native clipboard bridge receives redacted response details');
+      if (nativeClipboardAvailable) assert.ok(clipboard.includes('Bad request(2)'));
+      assert.equal(bridgeWrite.includes('local-smoke-secret'), false);
+      assert.equal(clipboard.includes('local-smoke-secret'), false);
+    }).toPass({ timeout: 5000 });
     await page.keyboard.press('Escape');
     await expect(responseDialog).not.toBeVisible();
     await page.getByRole('button', { name: '活动日志', exact: true }).click();
@@ -169,10 +203,29 @@ const http = require('node:http');
     assert.deepEqual(errors, []);
     // Closing with the tray preference disabled must actually quit, without changing network state.
     await page.getByRole('button', { name: '应用设置', exact: true }).click();
+    // Stub only the network boundary; exercise the checker state, IPC events,
+    // renderer prompt and validated external download target end to end.
+    await app.evaluate(({ shell }, directory) => {
+      const requireModule = process.getBuiltinModule('node:module').createRequire(`${directory}/package.json`);
+      const { UpdateChecker } = requireModule('./electron/updates.cjs');
+      UpdateChecker.prototype.fetchRelease = async function () {
+        return { status: 'available', currentVersion: this.currentVersion, latestVersion: '99.1.0', releaseUrl: 'https://github.com/65658dsf/CampusLink/releases/tag/v99.1.0', notes: '更新模拟内容\n<script>window.releaseExecuted=true</script>', publishedAt: '2026-10-12T00:00:00.000Z' };
+      };
+      shell.openExternal = async url => { global.__smokeReleaseUrl = url; };
+    }, root);
+    await page.getByRole('button', { name: '检查更新', exact: true }).click();
+    const updateDialog = page.getByRole('dialog', { name: '岚连有新版本了', exact: true });
+    await expect(updateDialog).toBeVisible();
+    await expect(updateDialog).toContainText('99.1.0');
+    await expect(updateDialog).toContainText('<script>window.releaseExecuted=true</script>');
+    assert.equal(await page.evaluate(() => window.releaseExecuted), undefined);
+    await updateDialog.getByRole('button', { name: '前往 Releases 下载', exact: true }).click();
+    assert.equal(await app.evaluate(() => global.__smokeReleaseUrl), 'https://github.com/65658dsf/CampusLink/releases/tag/v99.1.0');
+    await page.getByRole('button', { name: '关闭更新内容', exact: true }).click();
     await page.getByRole('switch', { name: '关闭时最小化到托盘', exact: true }).click();
     const closed = app.waitForEvent('close');
     await page.getByRole('button', { name: '关闭窗口', exact: true }).click();
     await closed;
-    console.log('Desktop smoke passed: renderer bridge, navigation, validation, startup guards, profile import/export/removal, local mock authentication, configurable outage reconnection, manual logout pause, response details and redaction, native clipboard, actual Windows credential encryption, responsive layout, and exit.');
+    console.log(`Desktop smoke passed: renderer bridge, navigation, validation, startup guards, per-profile JSON import/export, local mock authentication, configurable outage reconnection, manual logout pause, response details and redaction, update prompt and Releases navigation, ${nativeClipboardAvailable ? 'native clipboard' : 'clipboard bridge payload (host clipboard unavailable)'}, actual Windows credential encryption, responsive layout, and exit.`);
   } finally { await app.close().catch(() => {}); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

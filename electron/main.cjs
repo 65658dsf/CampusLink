@@ -5,7 +5,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { CampusService } = require('./service.cjs');
-const { MAX_PROFILE_BYTES, safeUrl, parseProfile } = require('./profiles.cjs');
+const { MAX_PROFILE_BYTES, safeUrl, parseProfile, exportProfile, exportProfileJson } = require('./profiles.cjs');
+const { UpdateChecker, safeReleaseUrl } = require('./updates.cjs');
 
 app.setName('岚连 · Campus Link');
 app.setAppUserModelId('cn.campuslink.desktop');
@@ -14,6 +15,10 @@ const isPrimary = app.requestSingleInstanceLock();
 let win = null;
 let tray = null;
 let service = null;
+let updates = null;
+let updateRetry = null;
+let lastConnectionStatus = 'idle';
+let updateConnectionGeneration = 0;
 let quitting = false;
 const indexPath = path.resolve(__dirname, '../dist/index.html');
 const indexUrl = pathToFileURL(indexPath).href;
@@ -38,6 +43,9 @@ function registerIpc() {
     return handler(...args);
   });
   handle('getSnapshot', () => service.snapshot());
+  handle('getUpdateState', () => updates.snapshot());
+  handle('checkForUpdates', () => updates.check());
+  handle('openRelease', () => shell.openExternal(safeReleaseUrl(updates.snapshot().releaseUrl)));
   handle('copyText', text => {
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024) throw new Error('复制内容无效或过长。');
     clipboard.writeText(text);
@@ -64,7 +72,9 @@ function registerIpc() {
       : '';
     const endpoints = profile.protocol === 'ruijie'
       ? `${profile.portalDiscovery ? '备用网关' : '锐捷'}发现入口：${profile.ruijie.discoveryUrl}\n${profile.portalDiscovery ? '备用网关允许的' : '允许的'}只读发现跳转来源：\n${[new URL(profile.homepage).origin, ...profile.ruijie.redirectOrigins].join('\n')}\n${profile.portalDiscovery ? '备用' : ''}认证接口：${new URL('/eportal/InterFace.do', profile.homepage).href}\n${profile.portalDiscovery ? '' : '账号和加密后的密码只提交到上述认证接口。\n'}服务名称编码：${profile.ruijie.serviceEncoding === 'percent' ? '百分号编码' : '原始文本'}`
-      : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`;
+      : profile.protocol === 'drcom'
+        ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM 接口：\n${['login', 'logout', 'chkstatus'].map(name => `GET ${new URL(`/drcom/${name}`, profile.homepage).href}`).join('\n')}\n使用应用内置的 Dr.COM 请求与状态确认流程。`
+        : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`;
     const confirmation = await dialog.showMessageBox(win, {
       type: 'question', title: '确认导入连接方案', message: `导入「${profile.name}」？`,
       detail: `作者：${profile.author || '未填写'}\n版本：${profile.version}\n${profile.portalDiscovery ? '' : `认证页：${profile.homepage}\n\n`}${discovery}${endpoints}\n\n${profile.portalDiscovery ? '自动发现以当前校园网络的认证跳转为依据，请确认连接的是你信任的校园网络。' : '连接时，账号和密码会发送给此方案指定的认证服务器。请确认你信任该方案及其地址。'}`,
@@ -80,6 +90,17 @@ function registerIpc() {
     if (result.canceled || !result.filePath) return { canceled: true };
     fs.copyFileSync(path.join(__dirname, '../examples', filename), result.filePath);
     service.log('success', '连接方案示例已保存。');
+    return { canceled: false, path: result.filePath };
+  });
+  handle('exportProfile', async id => {
+    if (typeof id !== 'string' || !id) throw new Error('请选择要导出的连接方案。');
+    // Export the stored definition, never the public snapshot, credentials,
+    // current field values or dynamically discovered authentication address.
+    const profile = exportProfile(service.profile(id));
+    const result = await dialog.showSaveDialog(win, { title: `导出「${profile.name}」连接方案`, defaultPath: `${profile.id}.json`, filters: [{ name: '连接方案 JSON', extensions: ['json'] }] });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    fs.writeFileSync(result.filePath, exportProfileJson(profile), { encoding: 'utf8', mode: 0o600 });
+    service.log('success', `连接方案「${profile.name}」已导出。`);
     return { canceled: false, path: result.filePath };
   });
   handle('openPortal', async id => {
@@ -106,6 +127,18 @@ function iconImage() {
   return nativeImage.createFromBitmap(pixels, { width: 16, height: 16 });
 }
 function showWindow() { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } }
+async function checkUpdatesAfterConnection() {
+  const generation = ++updateConnectionGeneration;
+  clearTimeout(updateRetry);
+  // The initial query may still be waiting for authentication. Await it first,
+  // then respect its actual cooldown before the single post-login retry.
+  const result = await updates.check();
+  if (quitting || generation !== updateConnectionGeneration || service.connection.status !== 'connected' || result.status !== 'error') return;
+  updateRetry = setTimeout(() => {
+    if (!quitting && generation === updateConnectionGeneration && service.connection.status === 'connected') void updates.check();
+  }, updates.retryDelayMs() + 25);
+  updateRetry.unref?.();
+}
 function trayAction(action) {
   Promise.resolve().then(action).catch(() => service.log('warning', '操作未完成，请打开主窗口检查当前设置。'));
 }
@@ -154,16 +187,19 @@ function createWindow() {
     else quitting = true;
   });
   win.on('closed', () => { win = null; });
+  win.webContents.once('did-finish-load', () => { if (app.isPackaged && !quitting) void updates.check(); });
   if (devUrl) win.loadURL(devUrl.href); else win.loadFile(indexPath);
 }
 
 if (!isPrimary) app.quit();
 else {
   app.on('second-instance', showWindow);
-  app.on('before-quit', () => { quitting = true; service?.dispose(); });
+  app.on('before-quit', () => { quitting = true; clearTimeout(updateRetry); service?.dispose(); });
   app.on('window-all-closed', () => { if (!tray || quitting) app.quit(); });
   app.on('activate', showWindow);
   app.whenReady().then(() => {
+    updates = new UpdateChecker({ currentVersion: app.getVersion() });
+    updates.on('change', state => { if (win && !win.isDestroyed()) win.webContents.send('campus:update', state); });
     service = new CampusService({
       directory: app.getPath('userData'), safeStorage, version: app.getVersion(), packaged: app.isPackaged,
       autoLaunch: enabled => {
@@ -183,7 +219,16 @@ else {
     configureSession(); registerIpc(); createWindow();
     tray = new Tray(iconImage().resize({ width: 20, height: 20 }));
     tray.on('double-click', showWindow);
-    service.on('snapshot', snapshot => { if (win && !win.isDestroyed()) win.webContents.send('campus:snapshot', snapshot); updateTray(snapshot); });
+    service.on('snapshot', snapshot => {
+      if (win && !win.isDestroyed()) win.webContents.send('campus:snapshot', snapshot);
+      updateTray(snapshot);
+      // Startup may precede campus authentication. Retry once after connecting;
+      // update requests remain separate from network authentication and logs.
+      if (app.isPackaged && snapshot.connection.status === 'connected' && lastConnectionStatus !== 'connected') {
+        void checkUpdatesAfterConnection();
+      }
+      lastConnectionStatus = snapshot.connection.status;
+    });
     updateTray(service.snapshot());
     void service.initialize().catch(() => service.log('warning', '启动状态检查未完成，请点击检测网络重试。'));
     powerMonitor.on('resume', () => { void service.refreshStatus().catch(() => {}); });

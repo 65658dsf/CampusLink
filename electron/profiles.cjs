@@ -4,6 +4,7 @@ const MAX_PROFILE_BYTES = 64 * 1024;
 const RESERVED = new Set(['__proto__', 'prototype', 'constructor']);
 const BASE_VARIABLES = ['username', 'password', 'ip', 'mac', 'acIp', 'acName'];
 const DEFAULT_PORTAL_DISCOVERY_URL = 'http://www.msftconnecttest.com/redirect';
+const PROFILE_KEYS = ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'portalDiscovery'];
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -96,7 +97,7 @@ function validateRuijie(value, homepage, fields) {
   if ((service.default !== undefined && !service.default.trim()) || service.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
 }
 function validateProfile(value, { builtin = false } = {}) {
-  keys(value, ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'portalDiscovery'], '连接方案');
+  keys(value, PROFILE_KEYS, '连接方案');
   if (value.schemaVersion !== 1) fail('仅支持 schemaVersion: 1');
   string(value.id, '方案 ID', 64);
   if (!/^[a-z][a-z0-9-]{2,63}$/.test(value.id) || (!builtin && value.id.startsWith('builtin-'))) fail('方案 ID 必须为小写字母、数字和连字符，且不能占用 builtin- 前缀');
@@ -106,7 +107,6 @@ function validateProfile(value, { builtin = false } = {}) {
   string(value.author, '作者', 80, true);
   const homepage = safeUrl(value.homepage, '认证页地址');
   if (!['drcom', 'http', 'ruijie'].includes(value.protocol)) fail('protocol 仅支持 drcom / http / ruijie');
-  if (value.protocol === 'drcom' && !builtin) fail('外部方案请使用声明式 http 或 ruijie 协议');
   if (value.protocol !== 'ruijie' && Object.hasOwn(value, 'ruijie')) fail('仅锐捷方案可声明 ruijie 配置');
   if (Object.hasOwn(value, 'portalDiscovery')) {
     if (!['drcom', 'ruijie'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie 方案');
@@ -141,6 +141,14 @@ function validateProfile(value, { builtin = false } = {}) {
     for (const name of ['login', 'logout', 'status']) if (!value.operations[name]) fail(`缺少 ${name} 请求；v1 方案须完整提供登录、注销与只读状态查询`);
     for (const name of Object.keys(value.operations)) validateOperation(value.operations[name], name, homepage.origin, variables);
   } else if (Object.hasOwn(value, 'operations')) fail('drcom / ruijie 方案不允许覆写 operations 请求');
+  if (value.protocol === 'drcom') {
+    const operator = value.fields?.find(field => field.key === 'operator');
+    if (operator) {
+      if (operator.default === undefined && !operator.options) fail('Dr.COM operator 字段须提供默认值或选项');
+      const values = [operator.default, ...(operator.options || []).map(option => option.value)].filter(item => item !== undefined);
+      if (values.some(item => !item.trim() || /[\r\n\u0000]/.test(item))) fail('Dr.COM operator 默认值和选项必须为非空单行字符串');
+    }
+  }
   if (value.protocol === 'ruijie') validateRuijie(value.ruijie, homepage, value.fields);
   const result = JSON.parse(JSON.stringify(value));
   if (result.protocol === 'ruijie') {
@@ -159,6 +167,27 @@ function parseProfile(text) {
 function publicProfile(profile, builtin = false) {
   const { id, name, description = '', version, author = '', homepage, protocol, fields = [], portalDiscovery } = profile;
   return { id, name, description, version, author, homepage, protocol, fields, builtin, ...(portalDiscovery ? { portalDiscovery } : {}) };
+}
+function exportProfile(profile) {
+  // Export the stored definition, never a connection snapshot or a resolved
+  // portal profile: runtime endpoints and credentials are not configuration.
+  object(profile, '连接方案');
+  const result = Object.fromEntries(PROFILE_KEYS.filter(key => Object.hasOwn(profile, key)).map(key => [key, profile[key]]));
+  if (typeof result.id === 'string' && result.id.startsWith('builtin-')) {
+    const base = result.id.slice('builtin-'.length);
+    result.id = `${/^[a-z]/.test(base) ? base : `campus-${base}`}`.slice(0, 59) + '-copy';
+  }
+  // The import parser provides a deep copy, enforces the 64 KB limit and keeps
+  // the exported Dr.COM, HTTP and ePortal definitions directly importable.
+  return parseProfile(JSON.stringify(result));
+}
+function exportProfileJson(profile) {
+  const portable = exportProfile(profile);
+  const readable = `${JSON.stringify(portable, null, 2)}\n`;
+  // Whitespace counts toward the import limit. Preserve a valid near-limit
+  // definition by falling back to compact JSON rather than exporting a file
+  // which this application cannot import again.
+  return Buffer.byteLength(readable, 'utf8') <= MAX_PROFILE_BYTES ? readable : JSON.stringify(portable);
 }
 function profileParameters(profile, input = {}) {
   object(input, '连接参数');
@@ -210,4 +239,4 @@ const builtinRuijieProfile = validateProfile({
 }, { builtin: true });
 const builtinProfiles = [builtinProfile, builtinRuijieProfile];
 
-module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, profileParameters, safeUrl, keys };
+module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, exportProfile, exportProfileJson, profileParameters, safeUrl, keys };

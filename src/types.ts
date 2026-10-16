@@ -6,6 +6,7 @@ export interface RequestDiagnostic { method: string; url: string; status?: numbe
 export interface LogEntry { id: string; time: string; level: 'info' | 'success' | 'warning' | 'error'; message: string; details?: { code: string; requests: RequestDiagnostic[] } }
 export interface Snapshot { settings: Settings; hasPassword: boolean; profiles: Profile[]; connection: { status: ConnectionState; message: string; monitoring: boolean; reconnectPaused?: boolean; portalUrl?: string; ip?: string; since?: string; checkedAt?: string; refreshing?: boolean; canDisconnect?: boolean }; logs: LogEntry[]; app: { version: string; platform: string; packaged: boolean; secureStorage: boolean } }
 export interface ConnectInput { profileId: string; username: string; password: string; rememberPassword: boolean; parameters: Record<string, string> }
+export interface UpdateState { status: 'idle' | 'checking' | 'up-to-date' | 'available' | 'error'; currentVersion: string; latestVersion?: string; releaseUrl?: string; notes?: string; publishedAt?: string; checkedAt?: string; message?: string }
 export interface CampusAPI {
   copyText(text: string): Promise<void>;
   getSnapshot(): Promise<Snapshot>;
@@ -16,6 +17,11 @@ export interface CampusAPI {
   importProfile(): Promise<{ canceled: boolean; snapshot: Snapshot }>;
   removeProfile(id: string): Promise<Snapshot>;
   exportExample(kind?: 'http' | 'ruijie'): Promise<{ canceled: boolean; path?: string }>;
+  exportProfile(id: string): Promise<{ canceled: boolean; path?: string }>;
+  getUpdateState(): Promise<UpdateState>;
+  checkForUpdates(): Promise<UpdateState>;
+  openRelease(): Promise<void>;
+  onUpdate(callback: (state: UpdateState) => void): () => void;
   openPortal(profileId: string): Promise<void>;
   clearCredentials(): Promise<Snapshot>;
   windowAction(action: 'minimize' | 'maximize' | 'close'): Promise<void>;

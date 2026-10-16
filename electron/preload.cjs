@@ -4,6 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 const invoke = method => (...args) => ipcRenderer.invoke(`campus:${method}`, ...args);
 contextBridge.exposeInMainWorld('campus', Object.freeze({
   getSnapshot: invoke('getSnapshot'),
+  getUpdateState: invoke('getUpdateState'),
+  checkForUpdates: invoke('checkForUpdates'),
+  openRelease: invoke('openRelease'),
   copyText: invoke('copyText'),
   saveSettings: invoke('saveSettings'),
   connect: invoke('connect'),
@@ -12,6 +15,7 @@ contextBridge.exposeInMainWorld('campus', Object.freeze({
   importProfile: invoke('importProfile'),
   removeProfile: invoke('removeProfile'),
   exportExample: invoke('exportExample'),
+  exportProfile: invoke('exportProfile'),
   openPortal: invoke('openPortal'),
   clearCredentials: invoke('clearCredentials'),
   windowAction: invoke('windowAction'),
@@ -20,5 +24,11 @@ contextBridge.exposeInMainWorld('campus', Object.freeze({
     const listener = (_event, snapshot) => callback(snapshot);
     ipcRenderer.on('campus:snapshot', listener);
     return () => ipcRenderer.removeListener('campus:snapshot', listener);
+  },
+  onUpdate(callback) {
+    if (typeof callback !== 'function') throw new TypeError('callback 必须为函数');
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('campus:update', listener);
+    return () => ipcRenderer.removeListener('campus:update', listener);
   },
 }));
