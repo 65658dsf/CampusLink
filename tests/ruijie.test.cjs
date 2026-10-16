@@ -225,6 +225,20 @@ test('literal script and meta-refresh navigation take precedence over a stale pa
   await assert.rejects(runOperation(third.profile, 'status'), { code: 'UNKNOWN_RESPONSE' });
 });
 
+test('same-path navigation follows new device parameters but ignores helper refreshes', async t => {
+  for (const redirect of [
+    `<script>window.location.href="/eportal/index.jsp?${rawQuery}";</script>`,
+    `<meta content="0; url=/eportal/index.jsp?${rawQuery}" http-equiv="refresh">`,
+  ]) {
+    const { profile, state } = await fixture(t, { firstTarget: '/eportal/index.jsp', indexHtml: redirect });
+    assert.equal((await runOperation(profile, 'status')).online, false);
+    assert.ok(state.calls.some(call => call.path === `/eportal/index.jsp?${rawQuery}`));
+  }
+  const refreshed = await fixture(t, { indexHtml: '<script>function refresh(){ window.location="./index.jsp"; }</script>' });
+  assert.equal((await runOperation(refreshed.profile, 'status')).online, false);
+  assert.equal(refreshed.state.calls.filter(call => call.path.startsWith('/eportal/index.jsp')).length, 1);
+});
+
 test('captcha is reported separately and stops automatic login loops in the service', async t => {
   const { profile } = await fixture(t, { loginResult: 'fail', message: '验证码错误.' });
   await assert.rejects(runOperation(profile, 'login', context), { code: 'CAPTCHA_REQUIRED' });
@@ -233,7 +247,7 @@ test('captcha is reported separately and stops automatic login loops in the serv
   const service = new CampusService({ directory, operation: async () => { throw new CampusError('请打开认证页完成验证码。', 'CAPTCHA_REQUIRED'); } });
   t.after(() => service.dispose());
   service.monitorArmed = true;
-  await service.connect({ username: 'fixture-account', password: 'fixture-password' }, { automatic: false });
+  await service.connect({ profileId: builtinRuijieProfile.id, username: 'fixture-account', password: 'fixture-password' }, { automatic: false });
   assert.equal(service.snapshot().connection.monitoring, false);
   assert.equal(service.reconnectContext, null);
 });

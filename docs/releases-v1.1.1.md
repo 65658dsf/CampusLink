@@ -1,4 +1,4 @@
-# 上游发布说明存档：Campus Link v1.1.1
+# 岚连 Campus Link v1.1.1
 
 开发者：**NingMeng123** · [项目主页](https://campuslink.xzncraft.cn/) · [开源仓库](https://github.com/65658dsf/CampusLink)
 
@@ -35,4 +35,4 @@ Windows 构建未配置代码签名，系统可能提示未知发布者。macOS 
 
 `SHA256SUMS.txt` 提供安装包和 `build-info.json` 的校验值；后者记录源码提交、系统、架构及签名状态。
 
-锐捷协议参考 [LFWQSP2641/scu_net_auto_login](https://github.com/LFWQSP2641/scu_net_auto_login)，保留其 MIT 许可与版权声明。岚连 · CDUTYB 专版为独立辅助工具，与学校、锐捷、Dr.COM 或 Microsoft 没有官方隶属关系。
+锐捷协议参考 [LFWQSP2641/scu_net_auto_login](https://github.com/LFWQSP2641/scu_net_auto_login)，保留其 MIT 许可与版权声明。岚连为独立辅助工具，与学校、锐捷、Dr.COM 或 Microsoft 没有官方隶属关系。

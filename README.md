@@ -1,203 +1,88 @@
-# 岚连 · CDUTYB 专版
+<div align="center">
 
-> 基于开源项目 [Campus Link](https://github.com/65658dsf/CampusLink)（作者 NingMeng123）构建的成都理工大学（宜宾校区）专版；已获原作者完整授权进行修改与分发，许可与署名见 [LICENSE](LICENSE)。
+<img src="assets/icon.png" width="88" alt="岚连 Campus Link 图标" />
 
-面向 Windows 和 macOS 的校园网认证工具，使用 Electron、React 和 TypeScript 构建。提供扁平化中文界面、连接状态、系统托盘、可配置的开机自启动，以及通过 JSON 导入的校园网连接方案。
+# 岚连 Campus Link
 
-默认内置成都理工大学（宜宾校区）的锐捷 ePortal 配置；贵州轻工职业大学（Dr.COM）与四川大学方案保留在代码中、默认在“连接方案”页折叠显示；其他学校可导入对应 JSON 方案。内置方案优先通过 `http://www.msftconnecttest.com/redirect` 只读探测当前网络的真实认证地址，原有学校地址保留为已知回退入口。本工具是独立的校园网辅助工具，与学校或认证服务商没有官方隶属关系。
+**简单连接，自在校园。**
 
-上游作者：**NingMeng123** · [GitHub 主页](https://github.com/65658dsf)；本专版在其完整授权下维护。
+面向 Windows 和 macOS 的轻巧校园网认证工具，让连接、守护与方案管理更省心。
 
-[在线使用文档与方案制作教程](https://campuslink.xzncraft.cn/)
+[![最新版本](https://img.shields.io/github/v/release/65658dsf/CampusLink?style=flat-square&color=159b7d)](https://github.com/65658dsf/CampusLink/releases/latest)
+[![下载次数](https://img.shields.io/github/downloads/65658dsf/CampusLink/total?style=flat-square&color=439fa8)](https://github.com/65658dsf/CampusLink/releases)
+[![构建状态](https://github.com/65658dsf/CampusLink/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/65658dsf/CampusLink/actions/workflows/release.yml)
+[![GitHub Stars](https://img.shields.io/github/stars/65658dsf/CampusLink?style=flat-square&color=e9b44c)](https://github.com/65658dsf/CampusLink/stargazers)
 
-本仓库 [CampusLink](https://github.com/65658dsf/CampusLink) 保存桌面客户端源码、认证适配器和自动化测试。独立仓库 [CampusLinkPages](https://github.com/65658dsf/CampusLinkPages) 保存 Vue 文档网站源码；网站与桌面客户端分别构建和维护。
+[**📥 下载客户端**](https://github.com/65658dsf/CampusLink/releases/latest) · [**📖 在线文档**](https://campuslink.xzncraft.cn/) · [**💬 反馈问题**](https://github.com/65658dsf/CampusLink/issues)
 
-## 安装和首次连接
+开发者：**[NingMeng123](https://github.com/65658dsf)**
 
-在 [GitHub Releases](https://github.com/65658dsf/CampusLink/releases) 按系统和处理器选择安装包。v1.1.1 的构建目标为：
+</div>
 
-```text
-Campus-Link-Setup-1.1.1.exe          Windows x64
-Campus-Link-1.1.1-mac-x64.dmg        Intel Mac
-Campus-Link-1.1.1-mac-arm64.dmg      Apple Silicon Mac
-```
+## ✨ 连接校园，少一点折腾
 
-macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程序”，再从该目录运行。默认构建未配置开发者签名或 Apple 公证，系统可能阻止打开；请核对来源并按照系统提示处理，不要关闭系统安全保护。未签名或未公证时，macOS 开机自启动也可能不可用。macOS 打包与系统行为仍需对应设备验证，不能将 CI 产物视为已完成校园网实测。
-
-1. Windows 运行安装程序并选择安装位置；macOS 安装到“应用程序”，然后打开“岚连 · CDUTYB 专版”。
-2. 先在系统中连接校园 Wi-Fi，或插入校园网网线。本工具完成网络认证，不代替操作系统的无线网络连接功能。
-3. 在“连接概览”选择对应学校。贵州轻工职业大学的网络类型保持“校园网”；四川大学选择“锐捷 ePortal”方案及账号已开通的网络服务；成都理工大学（宜宾校区）选择对应锐捷方案即可，无需选择服务；其他学校请导入匹配方案。
-4. 应用启动后会自动检测当前认证状态。若已通过认证，直接显示“已登录校园网”和会话详情，不再显示账号密码表单，也无须重复登录。
-5. 尚未认证时，输入学校提供的账号、密码，按需勾选“记住密码”，再点击连接按钮。
-
-需要结束认证时，在应用内点击“注销校园网”，或使用托盘菜单中的“断开认证”。退出应用与注销校园网是两个独立操作，退出应用不会自动断开现有认证。
-
-## 主要功能
-
-| 功能 | 使用方式 |
+| | 能做什么 |
 | --- | --- |
-| 连接和断开 | 在连接概览提交认证，已连接时可注销 |
-| 状态查询 | 启动时检测；网络守护开启后按设定间隔检查，也可手动“检测网络” |
-| 认证地址发现 | 内置 Dr.COM / 锐捷方案优先只读探测当前校园网入口，未识别到门户时回退已知学校地址 |
-| 开机自启动 | 在“连接偏好”或“应用设置”中开启；需要安装后的桌面版本，macOS 还受签名及系统登录项许可影响 |
-| 启动后自动连接 | 先保存账号密码，再单独开启；会先查询认证状态 |
-| 断线自动重连 | 默认开启，成功认证或确认在线后开始守护；明确离线时用可用凭据尝试恢复 |
-| 网络变化检测 | 接入或切换网络后立即进行一次静默状态检查，不必等待下一个检测间隔 |
-| 诊断导出 | 在“应用设置 → 诊断与帮助”导出脱敏诊断包（应用信息、网络概况、本次运行日志），不含密码，方便远程排障 |
-| 检测间隔 | 应用设置中配置 5–3600 秒，默认 10 秒 |
-| 托盘信息 | 悬浮显示本机 IP 与在线时长；托盘菜单可直接“暂停 / 恢复守护” |
-| 关闭到托盘 | 默认开启，可在应用设置中关闭；Windows 使用系统托盘，macOS 使用菜单栏图标 |
-| 外部方案 | 在“连接方案”导入 JSON、选择方案或移除外部方案 |
-| 导出当前方案 | 每张方案卡片点击“导出 JSON”，保存该方案完整配置；内置方案也可导出为可重新导入的副本 |
-| 方案示例 | “连接方案”中的“导出方案示例”（HTTP）或“导出锐捷示例” |
-| 活动日志 | 查看、按级别筛选和复制本次运行的最近 100 条记录；点击“查看响应”展开请求与服务器响应详情 |
-| 开发日志 | 左侧“开发日志”页记录版本更新、上游项目介绍与授权署名 |
-| 清除密码 | “应用设置 → 账号与隐私 → 清除密码” |
-| 检查更新 | 正式安装版启动时检查 GitHub 正式发行版，也可在“应用设置 → 软件更新”手动检查；发现新版后展示更新内容并前往 Releases 下载 |
+| 🔌 轻松认证 | 支持 Dr.COM、锐捷 ePortal Web 和声明式 HTTP 方案；内置方案自动发现认证入口 |
+| 🛡️ 网络守护 | 检测状态、断线重连、网络变化快速检查，托盘一键暂停或恢复 |
+| 🧩 灵活配置 | 搜索学校方案，导入 / 导出 JSON，扩展更多校园网络 |
+| 🔐 本地凭据 | 记住的密码通过系统加密保存，也支持仅在本次连接中使用 |
+| 🖥️ 桌面常驻 | Windows / macOS 托盘、可选开机自启动、启动后自动连接与更新检查 |
+| 🔎 方便排障 | 活动日志、服务器响应详情和脱敏诊断包导出 |
 
-每次启动都会先进行只读状态检查，无需保存账号密码，也无需开启启动后自动连接。断线自动重连默认开启：成功认证或检测到在线后，按设定间隔检查；仅在服务器明确返回离线时尝试重连，超时、HTTP 错误或未知响应不会触发认证。守护启用且未暂停时，返回窗口或系统唤醒也会刷新状态，连续刷新间隔至少 5 秒。
+<p align="center">
+  <img src="docs/images/connection-profiles.png" width="960" alt="岚连连接方案页面：首次启动引导、学校搜索和内置方案" />
+</p>
 
-“开机自启动”和“启动后自动连接”默认关闭，分别控制启动应用和启动时提交认证。只开启自启动不会替你登录。启动后自动连接仅在启动检查确认未认证时登录；已在线则跳过，状态查询失败则停止本次启动认证。
+## 🚀 三步开始
 
-“断线自动重连”独立控制持续守护，可使用本次成功连接留在内存中的密码，或安全保存的密码；没有可用凭据时只检测并提示手动连接。手动注销立即暂停守护，再次手动连接成功后恢复。关闭自动重连会停止周期检测；检测间隔修改后按新值运行。退出应用会停止守护，但不会替你注销校园网。
+1. **安装客户端**：从 [Releases](https://github.com/65658dsf/CampusLink/releases/latest) 下载 Windows x64、Intel Mac 或 Apple Silicon 对应安装包。
+2. **选择学校方案**：先连接校园 Wi-Fi 或网线，再到“连接方案”搜索学校。首次打开不会预选方案。
+3. **填写账号并连接**：已认证时会直接展示在线状态；需要认证时输入账号密码，按需开启记住密码和自动连接。
 
-认证地址发现不会向 Microsoft 提交账号密码。正常访问探测地址后跳转到 MSN、Bing 或返回普通网页，不代表已经通过校园网认证；应用只使用符合当前方案协议特征的真实门户进行认证和状态检查。没有发现新入口时，优先复用本次运行中已识别的来源，没有缓存则使用方案的已知入口。缓存不保存临时 `queryString`、MAC 或设备参数，退出后不持久化。
+内置 **贵州轻工职业大学（Dr.COM）**、**四川大学**、**成都理工大学（宜宾校区）** 方案；其他学校可[制作并导入 JSON](docs/plugin-guide.md)。具体部署仍需校内验证，锐捷支持范围为 ePortal 网页认证。
 
-## 检查软件更新
+> macOS 将应用拖入“应用程序”后运行。当前安装包未签名，macOS 也未公证，系统可能提示拦截；详见[安装说明](docs/usage.md#安装和首次连接)。
 
-在“应用设置 → 软件更新”点击“检查更新”，可查看当前版本、检查结果和检查时间。发现更新时会弹出新版本说明，同一版本在本次运行中只自动提示一次；关闭后仍可从设置页或顶部提示重新查看，并点击“前往 Releases 下载”打开该版本页面。
+## 📚 想了解更多
 
-正式安装版启动时会自动查询 `65658dsf/CampusLink` 的最新正式 Release，成功连接校园网后也会重试检查。开发模式不自动联网检查。草稿和预发布版本不会作为更新推送；比较按版本号的数字分段进行。网络不可达、超时或 GitHub 限流会显示检查失败，不会误报已是最新。
+[完整使用指南](docs/usage.md) · [方案制作](docs/plugin-guide.md) · [锐捷教程](docs/ruijie-guide.md) · [版本更新](docs/releases-v1.1.2.md) · [构建与发布](docs/releases.md)
 
-更新检查不上传校园网账号密码，不自动下载安装或执行远程内容；更新说明按纯文本展示，下载按钮只打开本仓库的 HTTPS Releases 页面。普通网络失败后 5 秒可重试，正常检查至少间隔 60 秒；受到限流时会适当延长等待。
+连接失败时先查看应用内日志，也可携带脱敏诊断信息提交 [Issue](https://github.com/65658dsf/CampusLink/issues)。学校账号、欠费或设备上限问题请联系校园网服务渠道。
 
-## 贵州轻工职业大学适配情况
+## 🛠️ 本地开发
 
-2026-10-11 已核验以下内容：
+需要 **Node.js 22.12+** 和 npm。
 
-- 认证页及其引用脚本可以访问。
-- 当前配置为 Dr.COM 本地认证，服务参数为 `R3=1`，标签“校园网”。
-- 当前账号不需要自动附加运营商后缀或旁路认证前缀。
-- `/drcom/chkstatus` 可返回结构化的认证状态。
-
-登录 `/drcom/login`、注销 `/drcom/logout` 的参数来自当前页面脚本。本轮经用户授权进行了真实登录请求诊断：旧参数顺序返回 HTTP 203 和 `Bad request(2)`；调整为网页参数顺序后返回 HTTP 200 JSONP，业务结果为 `error5`、`waitsec < 3`。用户另提供了同一参数顺序、`lang=en` 且 `result=1` 的成功抓包。v1.0.2 已对齐该请求顺序，并刻意保留网页请求中的两个 `lang=en` 参数。
-
-内置适配在请求被接受后再次查询状态，以确认认证或注销结果。本轮始终保留原有在线会话，未执行真实注销，也未验证断网后首次登录。其它校区或运营商配置仍需实际使用验证；本项目不宣称覆盖所有学校和所有 Dr.COM 部署。详细证据与限制见 [认证协议核验](docs/portal-protocol.md)。
-
-## 密码与本地数据
-
-勾选“记住密码”后，桌面主进程使用 Electron `safeStorage` 加密密码再保存。Windows 依赖 DPAPI，macOS 使用系统钥匙串；保护范围与当前系统用户相关，不代表可以防止同一用户权限下的其它程序访问。[Electron 官方说明](https://www.electronjs.org/docs/latest/api/safe-storage)
-
-账号、连接方案和偏好保存在 Electron 的 `userData` 目录；Windows 下通常为 `%APPDATA%\岚连 · CDUTYB 专版\settings.json`（从旧版本升级时，首次启动会自动迁移旧目录的 settings.json）。密码在该文件中是加密数据，不返回给界面，也不写入活动日志。没有勾选记住密码时，密码只用于当前运行中的认证操作，不持久化。
-
-“最近活动”和“活动日志”中的“查看响应”可展开错误摘要、错误代码及各次请求的方法、去掉查询参数的 URL、HTTP 状态码、响应类型、耗时和脱敏响应正文。每次请求的正文最多保留 16 KiB，超出时显示截断提示；正文以纯文本展示，可点击“复制详情”。诊断记录只保留在当前进程内存中，不写入本地设置或日志文件；关闭应用后清除，主动复制的内容会进入系统剪贴板。
-
-系统安全存储不可用时，应用会拒绝保存密码，仍可取消记住密码后手动连接。清除已保存密码会同时关闭自动连接。切换账号或连接方案也会移除旧凭据，避免将旧密码用于新身份。
-
-本地加密不改变学校认证协议的传输方式：目前贵州轻工职业大学入口及认证请求使用 HTTP。外部连接方案同样会向配置中指定的认证地址提交账号密码，应先核对学校提供的地址。卸载默认保留本地设置；如需移除已保存凭据，请先在应用中清除密码。
-
-## 扩展其它校园网
-
-应用支持三类**声明式 JSON 方案**：`http` 用于固定 GET/POST 接口与响应规则；`drcom` 复用应用受控的 Dr.COM Web 适配器；`ruijie` 使用受控的锐捷 ePortal Web 适配器，自动获取当前认证参数并完成 RSA 密码变换。它不加载或执行导入文件中的 JavaScript、Python 或可执行程序。
-
-1. 固定 HTTP 接口点击“导出方案示例”，或复制 [custom-campus.example.json](examples/custom-campus.example.json)；锐捷 ePortal 点击“导出锐捷示例”，或复制 [ruijie-campus.example.json](examples/ruijie-campus.example.json)。
-2. 根据学校真实认证接口修改地址、请求参数和响应规则。示例中的 `.invalid` 域名是占位符，不能直接登录；其中运营商选项也只是格式示例。
-3. 点击“导入连接方案”，选择 UTF-8 JSON 文件。
-4. 在列表中点击“使用此方案”，填写账号和自定义参数，再按需检测、连接。
-
-单文件最多 64 KB，可导入最多 30 个外部方案。导入不会自动认证，也不会自动覆盖相同 ID 的旧方案。通用字段与 HTTP 请求规则见 [扩展方案指南](docs/plugin-guide.md)；锐捷入口发现、抓包、服务编码、公钥配置和完整制作步骤见 [锐捷方案教程](docs/ruijie-guide.md)。
-
-每张方案卡片的“导出 JSON”会保存完整声明式配置，包括自动发现设置、HTTP 请求规则或锐捷公钥。导出内置方案时，ID 分别改为 `gzqy-copy`、`scu-ruijie-copy`，可以作为外部副本重新导入；外部方案保留原 ID，再次导入前需要修改 ID 或移除旧副本。导出不包含应用保存的账号、密码、当前字段选择、登录会话或运行期间发现的临时地址。文件仍保留方案作者声明的固定地址、默认值和请求模板，分享前请确认其中没有自行写入的个人信息。
-
-内置四川大学方案参考上游 ePortal Web 实现，支持确认在线、登录、注销及现有网络守护流程。它不是所有锐捷校园网的通用配置，也不支持锐捷 802.1X 客户端认证；其他学校需要替换入口、跳转源、服务值和公钥。当前只完成源码对照与本地模拟服务验证，**未在四川大学真实网络验证**。来源提交和第三方许可见 [锐捷方案教程](docs/ruijie-guide.md#参考来源与许可) 与 [第三方声明](assets/licenses/README.md)。
-
-`drcom` / `ruijie` 方案可使用顶层 `portalDiscovery: { "url": "http://www.msftconnecttest.com/redirect" }` 开启网络入口发现；内置方案和锐捷示例默认配置。`homepage` 仍是必须填写的已知回退地址，`ruijie.discoveryUrl` 保留为与它同源的已知发现入口。发现功能不会自动识别所有校园网协议，也不会替你选择其他学校的服务或 RSA 公钥。v1.1.1 的完整更新与验收边界见 [发布说明](docs/releases-v1.1.1.md)。
-
-## 本地开发
-
-使用 Node.js **22.12 或更高版本**及 npm，在项目目录执行：
-
-```powershell
+```bash
 npm ci
 npm run dev
 ```
 
-首次安装依赖和首次打包需要下载 Electron、构建工具等文件。`npm run dev` 启动 Vite 和 Electron 桌面窗口，开发模式不注册开机自启动。
+`npm run dev:web` 预览界面；`npm test` 运行测试；`npm run build` 检查类型并构建。更多命令见[使用指南](docs/usage.md#本地开发)。文档网站源码独立维护于 [CampusLinkPages](https://github.com/65658dsf/CampusLinkPages)。
 
-如只想调整和查看界面：
+## ⭐ Star History
 
-```powershell
-npm run dev:web
-```
+如果岚连帮到了你，欢迎点亮一颗 Star，让更多同学发现它。
 
-打开终端显示的本地地址。浏览器预览没有桌面桥接，不能执行认证、保存密码、导入本地方案或配置自启动，不会展示伪造的连接成功状态。
+<a href="https://www.star-history.com/?repos=65658dsf%2FCampusLink&amp;type=date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=65658dsf/CampusLink&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=65658dsf/CampusLink&amp;type=Date" />
+    <img alt="CampusLink Star History 趋势图" src="https://api.star-history.com/svg?repos=65658dsf/CampusLink&amp;type=Date" width="800" />
+  </picture>
+</a>
 
-| 命令 | 作用 |
-| --- | --- |
-| `npm run dev` | 启动桌面开发环境 |
-| `npm run dev:web` | 仅启动浏览器界面预览 |
-| `npm run typecheck` | TypeScript 类型检查 |
-| `npm run build` | 类型检查并构建界面，输出 `dist/` |
-| `npm start` | 使用已有 `dist/` 启动 Electron |
-| `npm test` | 运行本地自动化测试 |
-| `npm run test:desktop` | Windows 构建后运行桌面集成检查；仅向本机模拟服务认证 |
-| `npm run test:release` | 无网络检查发布标签、签名配置、产物完整性与校验和 |
-| `npm run pack:win` | 构建可直接运行的 Windows x64 应用目录 |
-| `npm run dist:win` | 构建 Windows x64 NSIS 安装程序 |
-| `npm run dist:mac` | 在 macOS 构建 x64、arm64 各自的 DMG 和 ZIP |
-| `npm run dist:mac:x64` / `npm run dist:mac:arm64` | 在 macOS 仅构建指定架构 |
+## ❤️ 感谢贡献者
 
-Windows 打包示例：
+感谢每一位提交代码、完善文档、反馈问题与分享校园方案的朋友。
 
-```powershell
-npm ci
-npm test
-npm run dist:win
-```
+<a href="https://github.com/65658dsf/CampusLink/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=65658dsf/CampusLink" alt="CampusLink 代码贡献者头像" />
+</a>
 
-安装程序输出到 `release/Campus-Link-Setup-1.1.1.exe`；只构建应用目录时，入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包必须在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。所有打包命令明确禁用自动上传。`dist/` 是界面构建产物，不能替代完整桌面程序。
+<sub>头像由 <a href="https://contrib.rocks">contrib.rocks</a> 根据 GitHub 贡献记录自动更新，点击可查看完整列表。</sub>
 
-自动化测试使用本机模拟服务和模拟凭据，覆盖方案校验、HTTP 编码、JSONP 解析、响应判定、加密存储流程、自动连接约束等。测试不会向真实校园网提交认证或注销，也不能替代真实账号的连接验收。
+---
 
-## GitHub Actions 自动发布
-
-推送到 `main` 或提交 PR 会运行 Linux 单元测试、发布流程检查和界面构建。发布版本时，将 `package.json` 与 `package-lock.json` 的版本一起更新并合入 `main`，再推送匹配的标签，例如 `v1.1.1`。工作流确认标签提交属于 `main` 后，分别在 Windows、Intel Mac 和 Apple Silicon Mac runner 构建；全部成功后由独立发布任务统一上传到 GitHub Releases。
-
-普通提交不会创建 Release。也可在 Actions → Desktop CI and Release → Run workflow 中选择 `main`，输入已存在且版本匹配的标签重试。没有 Apple secrets 时仍会生成未签名产物；配置完整证书及公证凭据后才启用对应步骤。完整配置、发布命令和失败恢复见 [发布指南](docs/releases.md)。
-
-## 常见问题
-
-**提示无法访问认证服务器**：先检查 Windows 是否已接入校园网络，再打开认证页。如果浏览器也无法访问，优先检查网络接入和校内服务。状态查询失败代表暂时无法确认认证状态，不代表已成功断开。
-
-**提示认证失败**：检查账号、密码和所选网络类型。学校的欠费、账号停用、设备限制等情况需要在认证页或通过校园网服务渠道处理。
-
-**提示服务器响应无法识别**：在“最近活动”或“活动日志”点击该条记录的“查看响应”，检查 HTTP 状态和服务器返回的文本；“复制详情”会复制已脱敏的诊断信息。若服务器返回了网页或错误文本，应用不会将其当作认证成功。没有响应详情的错误可通过“查看详情”查看摘要。
-
-**自启动开关无法开启**：开发模式和浏览器预览不能注册自启动。Windows 安装后检查“启动应用”；macOS 从“应用程序”运行，并检查系统的“登录项”。未签名或未公证的 macOS 构建可能无法注册登录项。
-
-**无法开启自动连接**：先在连接页面勾选记住密码并提交账号，再开启自动连接；系统安全存储必须可用。建议先确认手动认证成功。
-
-**导入失败**：确认文件为有效 JSON，ID 没有重复，接口和认证页同源，模板变量已声明，成功与失败规则完整。具体要求见 [扩展方案指南](docs/plugin-guide.md)。
-
-**关闭后仍在运行**：这是默认的关闭到托盘行为。右键系统托盘图标，选择“退出岚连 · CDUTYB 专版”即可退出。
-
-## 授权与许可
-
-- 本专版基于 [Campus Link](https://github.com/65658dsf/CampusLink)（作者 **NingMeng123**）构建，已获得原作者的完整修改与分发授权（2026-10-16 经维护者确认）。
-- 本仓库以 [MIT 许可](LICENSE) 发布，署名包含上游原作者与「岚连 · CDUTYB 专版」。
-- 上游与第三方许可声明（含 `scu_net_auto_login` 的 MIT 全文）保留在 [assets/licenses](assets/licenses/README.md) 目录，均按原文保留。
-
-## 代码位置
-
-| 位置 | 职责 |
-| --- | --- |
-| `src/` | React 界面、样式及桌面 API 类型 |
-| `electron/main.cjs` | 窗口、托盘、IPC、自启动和文件对话框 |
-| `electron/service.cjs` | 设置、凭据、连接状态和方案管理 |
-| `electron/profiles.cjs` | 内置方案及外部 JSON 校验 |
-| `electron/adapters.cjs` | Dr.COM 与通用 HTTP 认证适配 |
-| `electron/ruijie.cjs` | 锐捷 ePortal 入口发现、RSA 密码变换及认证状态确认 |
-| `electron/transport.cjs` | 超时、响应大小限制、JSONP 数据解析 |
-| `electron/diagnostics.cjs` | 请求诊断、敏感信息脱敏与响应正文大小限制 |
-| `examples/` | 可导出的方案示例 |
-| `tests/` | 本机自动化测试 |
+岚连是独立校园网辅助工具，与学校或认证服务商无官方隶属关系。使用外部方案前请核对认证地址；[隐私说明](docs/usage.md#密码与本地数据) · [第三方声明](assets/licenses/README.md)。

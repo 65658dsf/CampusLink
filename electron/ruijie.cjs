@@ -35,8 +35,8 @@ function rsaEncrypt(value, publicKey) {
 }
 
 function encryptPassword(password, mac, publicKey) {
-  // The SCU-style reference packs `password>mac`; some deployments (for
-  // example CDUT-Yibin) encrypt the reversed password alone via rsaEncrypt.
+  // The SCU and CDUT-Yibin profiles pack `password>mac`; a profile may opt
+  // into password-only encryption after verifying its portal's script.
   return rsaEncrypt(`${password}>${mac}`, publicKey);
 }
 
@@ -138,9 +138,9 @@ function createPortalSession(profile, requester, onSecret) {
         const next = allowedUrl(target, current, profile);
         // Portals ship literal self-navigation inside helper functions (for
         // example the success page's `window.location="./success.jsp"`).
-        // Keep the current document when the target has the same origin and
-        // path so a page refresh is not mistaken for a redirect loop.
-        if (next.origin !== current.origin || next.pathname !== current.pathname) {
+        // Ignore a helper's refresh while preserving real same-path redirects
+        // that supply new device/session parameters in the query string.
+        if (next.origin !== current.origin || next.pathname !== current.pathname || (next.search && next.search !== current.search)) {
           current = next;
           continue;
         }
@@ -207,8 +207,8 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
     const service = context.parameters?.service ?? profile.fields?.find(field => field.key === 'service')?.default ?? '';
     const serviceRequired = profile.ruijie.serviceOptional !== true;
     if ((serviceRequired && !service) || !context.username || !context.password) throw new CampusError(serviceRequired ? '请填写校园网账号、密码并选择网络服务。' : '请填写校园网账号和密码。', 'INVALID_PARAMETERS');
-    // Deployments differ: SCU packs `password>mac` into the legacy transform,
-    // CDUT-Yibin encrypts the reversed password alone.
+    // Password-only encryption is opt-in; both built-in ePortal schools use
+    // the default `password>mac` transform.
     const password = profile.ruijie.passwordWithMac === false
       ? rsaEncrypt(context.password, profile.ruijie.publicKey)
       : encryptPassword(context.password, status.mac, profile.ruijie.publicKey);

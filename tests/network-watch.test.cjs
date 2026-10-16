@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { createNetworkWatcher, interfaceSignature } = require('../electron/network-watch.cjs');
 const { CampusService, defaults } = require('../electron/service.cjs');
+const { builtinProfile, profileParameters } = require('../electron/profiles.cjs');
 
 function fakeClock() {
   let time = 100000, nextId = 0;
@@ -49,6 +50,7 @@ function fixture(t, operation, saved) {
     decryptString: value => [...value.toString()].reverse().join(''),
   } });
   t.after(() => { service.dispose(); fs.rmSync(directory, { recursive: true, force: true }); });
+  if (!saved) service.saveSettings({ profileId: builtinProfile.id });
   return { service, clock };
 }
 
@@ -113,7 +115,7 @@ test('a guard-armed interface change reconnects immediately with the saved passw
   let online = true;
   const calls = [];
   const password = 'interface-change-password';
-  const settings = { ...defaults(), username: 'guard-account', rememberPassword: true };
+  const settings = { ...defaults(), profileId: builtinProfile.id, parameters: profileParameters(builtinProfile), username: 'guard-account', rememberPassword: true };
   const { service, clock } = fixture(t, async (_profile, action, context) => {
     calls.push(action);
     if (action === 'login') { assert.equal(context.password, password); online = true; }

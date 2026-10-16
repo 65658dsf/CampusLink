@@ -52,7 +52,7 @@ function releaseNotes(version, builds, generatedNotes = '', { authored = false }
     '- 新增标签驱动的 GitHub Actions 发布：完整校验、三平台打包、产物校验和及统一 Release 上传。', '',
   ] : [generatedNotes, ''];
   return [
-    `# 岚连 · CDUTYB 专版 v${version}`, '', '上游作者：NingMeng123（基于 Campus Link）；本专版：岚连 · CDUTYB 专版', '',
+    `# 岚连 Campus Link v${version}`, '', '开发者：NingMeng123', '',
     ...changes,
     '提供 Windows x64 安装程序，以及 Intel Mac（x64）和 Apple Silicon（arm64）各自的 DMG / ZIP。请按设备架构选择。', '',
     'Windows 构建未配置代码签名，系统可能显示未知发布者提示。', ...mac, '',
@@ -79,8 +79,8 @@ function main() {
   fs.writeFileSync(notes, releaseNotes(version, builds, generatedNotes, { authored: fs.existsSync(authoredNotes) }));
   const existing = JSON.parse(gh('release', 'list', '--limit', '1000', '--json', 'tagName,isDraft')).find(item => item.tagName === tag);
   if (existing && !existing.isDraft) throw new Error('This version is already published. Do not overwrite it; release a new version.');
-  if (!existing) gh('release', 'create', tag, '--verify-tag', '--draft', '--title', `岚连 · CDUTYB 专版 ${tag}`, '--notes-file', notes);
-  else gh('release', 'edit', tag, '--title', `岚连 · CDUTYB 专版 ${tag}`, '--notes-file', notes);
+  if (!existing) gh('release', 'create', tag, '--verify-tag', '--draft', '--title', `岚连 Campus Link ${tag}`, '--notes-file', notes);
+  else gh('release', 'edit', tag, '--title', `岚连 Campus Link ${tag}`, '--notes-file', notes);
   gh('release', 'upload', tag, ...assets.map(file => path.join(directory, file)), '--clobber');
   // A failed upload leaves a recoverable draft instead of a partial public release.
   gh('release', 'edit', tag, '--draft=false');

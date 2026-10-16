@@ -39,6 +39,45 @@ test('the report carries app facts, network overview, profile and sanitized logs
   assert.equal(report.connection.ip, '10.1.2.3');
   assert.equal(report.logs.length, 1);
   assert.equal(report.logsOmitted, 0);
+  assert.deepEqual(report.settings.parameters, { operator: '[已隐藏]' });
+});
+
+test('exports sanitize raw log echoes, device fields and URL credentials at the boundary', () => {
+  const value = snapshot();
+  const account = value.settings.username;
+  const mac = 'A0:01:02:03:04:05';
+  const token = 'private-session-token';
+  value.settings.parameters = { mac, access_token: token, extraField: 'private-custom-value' };
+  value.connection.message = `Denied ${account} ${encodeURIComponent(token)} ${mac}`;
+  value.connection.portalUrl = `http://portal-user:portal-pass@10.1.2.1/eportal/index.jsp?token=${token}&mac=${mac}#private-fragment`;
+  value.logs = [{
+    id: 'raw-log', time: '2026-10-16T00:00:00.000Z', level: 'warning',
+    message: `${account} ${Buffer.from(account).toString('base64')} ${token} 0011.2233.4455 aabbccddeeff`,
+    password: 'unexpected-private-property',
+    details: { code: 'AUTH_REJECTED', cookie: 'unexpected-cookie-property', requests: [{
+      method: 'POST', url: `http://log-user:log-pass@10.1.2.1/login?sessionid=log-session#fragment`,
+      responseBody: `student=${account} token="${token}"\nSet-Cookie: sid=server-cookie; Path=/\nmac=${mac}`,
+      status: 403, statusText: token, contentType: 'text/html', durationMs: 1,
+    }] },
+  }];
+  const text = buildDiagnosticsReport(value, { interfaces: {} });
+  for (const secret of [account, Buffer.from(account).toString('base64'), mac, token, 'private-custom-value', 'portal-user', 'portal-pass', 'private-fragment', '0011.2233.4455', 'aabbccddeeff', 'unexpected-private-property', 'unexpected-cookie-property', 'log-user', 'log-pass', 'log-session', 'server-cookie']) {
+    assert.equal(text.includes(secret), false, secret);
+  }
+  const report = JSON.parse(text);
+  assert.equal(report.connection.portalUrl, 'http://10.1.2.1/eportal/index.jsp');
+  assert.equal(report.logs[0].details.requests[0].url, 'http://10.1.2.1/login');
+  assert.equal(report.logs[0].details.requests[0].status, 403);
+  assert.deepEqual(report.settings.parameters, { mac: '[已隐藏]', access_token: '[已隐藏]', extraField: '[已隐藏]' });
+  assert.equal(value.logs[0].details.requests[0].statusText, token, 'export must not mutate the in-memory log');
+});
+
+test('invalid portal URLs are omitted without copying their source text', () => {
+  const value = snapshot();
+  value.connection.portalUrl = 'javascript:private-url-secret';
+  const text = buildDiagnosticsReport(value, { interfaces: {} });
+  assert.equal(text.includes('private-url-secret'), false);
+  assert.equal(JSON.parse(text).connection.portalUrl, '[无效地址]');
 });
 
 test('oversized exports drop the oldest logs first and stay valid JSON', () => {
@@ -51,6 +90,18 @@ test('oversized exports drop the oldest logs first and stay valid JSON', () => {
   assert.ok(report.logsOmitted > 0);
   assert.ok(report.logs.length < value.logs.length);
   assert.equal(typeof report.note, 'string');
+});
+
+test('the omission note is included in the final one MiB budget', () => {
+  const value = snapshot();
+  value.logs = [{ id: 'latest', time: '', level: 'info', message: '' }];
+  const options = { interfaces: {}, generatedAt: '2026-10-16T00:00:00.000Z' };
+  const overhead = Buffer.byteLength(buildDiagnosticsReport(value, options));
+  value.logs[0].message = 'x'.repeat(MAX_REPORT_BYTES - overhead - 20);
+  value.logs.push({ id: 'oldest', time: '', level: 'info', message: 'y'.repeat(200) });
+  const text = buildDiagnosticsReport(value, options);
+  assert.ok(Buffer.byteLength(text, 'utf8') <= MAX_REPORT_BYTES);
+  assert.ok(JSON.parse(text).logsOmitted > 0);
 });
 
 test('interfaceSummary ignores loopback and non-IPv4 entries and sorts rows', () => {

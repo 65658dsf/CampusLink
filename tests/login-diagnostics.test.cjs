@@ -44,7 +44,7 @@ test('the observed HTTP 203 HTML rejection reaches clickable logs with a redacte
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campus-response-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const service = new CampusService({ directory, operation: (_profile, operation, context) => runOperation(localProfile, operation, context) });
-  const snapshot = await service.connect({ username, password, rememberPassword: false });
+  const snapshot = await service.connect({ profileId: builtinProfile.id, username, password, rememberPassword: false });
   assert.equal(snapshot.connection.status, 'error');
   assert.match(snapshot.connection.message, /Bad request\(2\)/);
   const errorLog = snapshot.logs.find(log => log.level === 'error');

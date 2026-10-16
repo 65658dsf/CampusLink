@@ -2,7 +2,7 @@
 
 开发者：**NingMeng123** · [GitHub](https://github.com/65658dsf/CampusLink)
 
-本教程适用于**锐捷 ePortal Web 网页认证**。岚连 · CDUTYB 专版默认内置成都理工大学（宜宾校区）锐捷方案；贵州轻工职业大学（Dr.COM）与四川大学方案保留在代码中、默认折叠显示；其他学校可导入锐捷 JSON 配置。认证入口优先从当前网络探测；方案只描述参数，不执行导入文件中的脚本。
+本教程适用于**锐捷 ePortal Web 网页认证**。岚连内置贵州轻工职业大学 Dr.COM、四川大学与成都理工大学（宜宾校区）锐捷方案，也允许导入其他学校的锐捷 JSON 配置。首次打开需在“连接方案”中搜索并选择学校，不预选默认方案。认证入口优先从当前网络探测；方案只描述参数，不执行导入文件中的脚本。
 
 四川大学配置来自公开源码对照；当前没有在四川大学真实校园网进行登录、注销或重连验收。本机模拟服务可检查请求、编码和状态处理，但不能证明学校当前部署接受这些参数。
 
@@ -125,16 +125,16 @@ GET http://192.168.2.135/
 | `ruijie.discoveryUrl` | 可选，与 `homepage` 同源；默认 `homepage`，保持作为已知发现入口，网络发现优先 |
 | `ruijie.redirectOrigins` | 可选，默认 `[]`；最多 8 个无重复、无尾部斜杠的完整来源 |
 | `ruijie.publicKey` | 必填，只包含 `modulus`、`exponent` 两个十六进制字符串 |
-| `ruijie.serviceEncoding` | 可选，`plain` 或 `percent`；默认 `plain`，控制服务名称进入表单前是否再编码一次 |
-| `ruijie.passwordWithMac` | 可选布尔值，默认 `true`：RSA 输入为 `密码 + ">" + mac`；设为 `false` 时只加密反转后的密码本身（成都理工大学宜宾校区等部署） |
-| `ruijie.serviceOptional` | 可选布尔值，默认 `false`；设为 `true` 时允许省略 `service` 字段或留空，登录提交空服务名 |
-| `ruijie.valueEncoding` | 可选，`plain` 或 `percent`；默认 `plain`。设为 `percent` 时账号与 `queryString` 会先整体百分号编码再进入表单（抓包表现为双重编码，成都理工大学宜宾校区等部署） |
+| `ruijie.serviceEncoding` | 可选，`plain` 或 `percent`；默认 `plain` |
+| `ruijie.passwordWithMac` | 可选布尔值，默认 `true`，RSA 输入为 `密码 + ">" + mac`；仅在学校网页脚本确认只加密密码时设为 `false` |
+| `ruijie.serviceOptional` | 可选布尔值，默认 `false`；为 `true` 时允许省略或留空 `service`，适用于登录时不选择网络服务的部署 |
+| `ruijie.valueEncoding` | 可选，`plain` 或 `percent`；默认 `plain`。`percent` 对账号与 `queryString` 在表单序列化前再编码一次 |
 | `fields` | 默认必须包含 `service` 字段，提供非空默认值或非空选项；`serviceOptional` 为 `true` 时可省略 |
 | `operations` | 锐捷方案不允许填写；由主程序固定实现登录、注销和状态检查 |
 
 这里只能配置以上能力。添加 `headers`、动态脚本、任意 API 路径或未知属性会被拒绝，不能把通用 HTTP 的 `operations` 复制到锐捷方案中。
 
-抓包对照提示：登录请求里 `userId` 或 `queryString` 出现 `%25`（例如 `%2540`、`%253D`）说明该部署多编码了一层，应设置 `valueEncoding: "percent"`；登录表单 `service` 为空时设置 `serviceOptional: true` 并省略 `service` 字段；只有确认登录页不是按 `密码>mac` 拼接再加密（例如页面脚本直接把密码本身交给 RSA）时才设置 `passwordWithMac: false`。成都理工大学（宜宾校区）内置方案使用其中的 `valueEncoding` 与 `serviceOptional` 两项，密码加密与川大相同。
+成都理工大学（宜宾校区）内置方案启用 `serviceOptional: true` 与 `valueEncoding: "percent"`，登录提交空服务名，账号与查询串在表单中呈现双重编码。密码仍使用默认的 `密码>mac` RSA 输入，与川大方案一致。参数来自 PR 提供的抓包对照，本项目使用本机模拟服务验证，仍需相应校园实际网络验收。
 
 ## 7. 导入、检查和实际验收
 
@@ -146,7 +146,7 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 
 将最后的文件路径替换成自己的配置。此命令不会请求学校服务器；示例占位地址和示例密钥也能通过结构检查，必须先替换为真实参数才能使用。
 
-1. 打开岚连 · CDUTYB 专版“连接方案 → 导入连接方案”，选择 UTF-8 JSON。核对导入提示中的学校、来源与服务，导入本身不会提交账号密码。
+1. 打开岚连“连接方案 → 导入连接方案”，选择 UTF-8 JSON。核对导入提示中的学校、来源与服务，导入本身不会提交账号密码。
 2. 点击“使用此方案”。已有认证时先按正常操作退出当前会话，再切换方案。
 3. 在已登录状态点击“检测网络”，应直接显示已登录，不应重复提交密码。
 4. 在自己可以中断网络的时间，点击“注销校园网”。应用应确认离线并暂停网络守护。
@@ -163,7 +163,7 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 
 注销也先检查状态，已离线时直接结束；在线时从成功页提取 `userIndex`（如果存在），提交 `method=logout`。存在索引则提交该字段，缺少索引时采用川大参考实现的空正文方式。服务器接受注销后，再用 GET 确认离线。要求其他注销字段或独立状态 API 的部署不在此配置能力范围内。
 
-认证成功或确认在线后接入应用已有的网络守护，默认 10 秒，设置中可调整或关闭。只有明确离线时才使用本次会话或已保存凭据尝试连接；用户手动注销或托盘暂停会停止守护。
+认证成功或确认在线后接入应用已有的网络守护，新用户默认 10 秒，已有设置保持原值，设置中可调整或关闭。只有明确离线时才使用本次会话或已保存凭据尝试连接；用户手动注销会暂停守护，托盘菜单也可暂停或恢复守护。
 
 ## 9. 排错与能力边界
 
@@ -191,4 +191,4 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 - 指定参考项目 [LFWQSP2641/scu_net_auto_login](https://github.com/LFWQSP2641/scu_net_auto_login)，固定提交 `194c8b9da995eeef4f6d1f3b83a9f03350293bb0`：[发现与登录实现](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib/Service/LoginService.cs)、[协议常量](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib/Common/LoginConstants.cs)、[RSA 实现](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib/Helper/LegacyCampusRsaEncryptor.cs)、[RSA 固定测试向量](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib.Test/RsaEncryptorTests.cs)。
 - 同作者 Go 实现固定提交 `8677927e207befa520cbe3ccbfcc4ea4ea56a0af`：[川大空正文注销及响应判断](https://github.com/LFWQSP2641/scunet-auto-login/blob/8677927e207befa520cbe3ccbfcc4ea4ea56a0af/pkg/schools/scu/portal/rvjx/logout.go)。
 
-RSA 兼容实现及测试向量的上游 MIT 许可完整保存在 [scu-net-auto-login-MIT.txt](../assets/licenses/scu-net-auto-login-MIT.txt)，保留 `Copyright (c) 2026 LFWQSP2641`。上游的集成、配置和文档开发者为 **NingMeng123**；本专版基于其实现构建。
+RSA 兼容实现及测试向量的上游 MIT 许可完整保存在 [scu-net-auto-login-MIT.txt](../assets/licenses/scu-net-auto-login-MIT.txt)，保留 `Copyright (c) 2026 LFWQSP2641`。岚连的集成、配置和文档开发者为 **NingMeng123**。

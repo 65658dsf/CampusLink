@@ -2,8 +2,7 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const electron = require('electron');
 const root = path.resolve(__dirname, '..');
-const devPort = 5273;
-const vite = spawn(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--port', String(devPort), '--strictPort'], { cwd: root, stdio: 'inherit', windowsHide: true });
+const vite = spawn(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js')], { cwd: root, stdio: 'inherit', windowsHide: true });
 let desktop;
 let ending = false;
 function stop(code = 0) {
@@ -19,10 +18,9 @@ vite.on('exit', code => stop(code || 0));
 (async () => {
   for (let attempt = 0; attempt < 80; attempt++) {
     try {
-      const response = await fetch(`http://127.0.0.1:${devPort}`);
+      const response = await fetch('http://127.0.0.1:5173');
       if (response.ok) {
-        const env = { ...process.env, VITE_DEV_SERVER_URL: `http://127.0.0.1:${devPort}` };
-        if (!env.CAMPUS_LINK_DATA_DIR) env.CAMPUS_LINK_DATA_DIR = path.join(root, 'dev-data');
+        const env = { ...process.env, VITE_DEV_SERVER_URL: 'http://127.0.0.1:5173' };
         delete env.ELECTRON_RUN_AS_NODE;
         desktop = spawn(electron, ['.'], { cwd: root, stdio: 'inherit', env, windowsHide: true });
         desktop.on('exit', code => stop(code || 0));
