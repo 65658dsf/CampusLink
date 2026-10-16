@@ -8,7 +8,7 @@ const { builtinProfiles, defaultProfile, publicProfile, validateProfile, parsePr
 const { runOperation } = require('./adapters.cjs');
 const { CampusError } = require('./transport.cjs');
 
-const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, parameters: profileParameters(defaultProfile) });
+const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, appearance: 'classic', parameters: profileParameters(defaultProfile) });
 const IDLE = () => ({ status: 'idle', message: '准备就绪，连接校园网络后即可认证。' });
 
 class CampusService extends EventEmitter {
@@ -41,7 +41,7 @@ class CampusService extends EventEmitter {
     this.refreshing = false;
     this.connection = IDLE();
     this.logs = [];
-    this.appInfo = { version, platform, packaged, firstRun: this.firstRun, secureStorage: this.storageAvailable() };
+    this.appInfo = { version, platform, packaged, windowGlass: false, firstRun: this.firstRun, secureStorage: this.storageAvailable() };
     this.load();
     this.log('info', '岚连 · CDUTYB 专版已就绪，首次连接按启动偏好执行；确认在线后可按设置检测并自动重连。', false);
   }
@@ -163,12 +163,13 @@ class CampusService extends EventEmitter {
   publish() { const value = this.snapshot(); this.emit('snapshot', value); return value; }
   assertIdle() { if (this.busy) throw new Error('正在处理网络请求，请稍候。'); }
   validatedSettings(input) {
-    keys(input, ['profileId', 'username', 'rememberPassword', 'autoLaunch', 'autoConnect', 'autoReconnect', 'reconnectIntervalSeconds', 'minimizeToTray', 'parameters'], '设置');
+    keys(input, ['profileId', 'username', 'rememberPassword', 'autoLaunch', 'autoConnect', 'autoReconnect', 'reconnectIntervalSeconds', 'minimizeToTray', 'appearance', 'parameters'], '设置');
     if (typeof input.profileId !== 'string') throw new Error('连接方案无效。');
     const profile = this.profile(input.profileId);
     if (typeof input.username !== 'string' || input.username.length > 200 || /[\r\n\u0000]/.test(input.username)) throw new Error('账号格式无效。');
     for (const key of ['rememberPassword', 'autoLaunch', 'autoConnect', 'autoReconnect', 'minimizeToTray']) if (typeof input[key] !== 'boolean') throw new Error('设置值无效。');
     if (!Number.isInteger(input.reconnectIntervalSeconds) || input.reconnectIntervalSeconds < 5 || input.reconnectIntervalSeconds > 3600) throw new Error('检测间隔必须是 5 至 3600 秒的整数。');
+    if (input.appearance !== 'classic' && input.appearance !== 'liquid') throw new Error('界面外观设置无效。');
     return { ...input, username: input.username.trim(), parameters: profileParameters(profile, input.parameters) };
   }
   saveSettings(patch) {
@@ -197,6 +198,14 @@ class CampusService extends EventEmitter {
     }
     if (next.reconnectIntervalSeconds !== previousSettings.reconnectIntervalSeconds) { this.cancelMonitorTimer(); this.scheduleMonitor(); }
     if (changedProfile) this.connection = IDLE();
+    this.persist();
+    return this.publish();
+  }
+  setAppearance(value) {
+    // 界面外观切换与网络状态无关：不受连接忙碌限制，仅持久化并广播快照。
+    if (value !== 'classic' && value !== 'liquid') throw new Error('界面外观设置无效。');
+    if (value === this.settings.appearance) return this.snapshot();
+    this.settings = { ...this.settings, appearance: value };
     this.persist();
     return this.publish();
   }

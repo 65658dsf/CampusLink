@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, EthernetPort, ExternalLink, Eye, EyeOff, FileJson2, GraduationCap, LayoutDashboard, LoaderCircle, LockKeyhole, Minus, Monitor, MoreHorizontal, Network, Power, Puzzle, Radio, RefreshCw, Settings2, ShieldCheck, Sparkles, Square, Terminal, Trash2, Upload, Wifi, X, FileText, KeyRound } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowDownToLine, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, EthernetPort, ExternalLink, Eye, EyeOff, FileJson2, GraduationCap, LayoutDashboard, LoaderCircle, LockKeyhole, Minus, Monitor, MoreHorizontal, Network, Power, Puzzle, Radio, RefreshCw, Settings2, ShieldCheck, Sparkles, Square, Terminal, Trash2, Upload, Wifi, X, FileText, Palette, KeyRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api, isPreview } from './api';
 import type { LogEntry, Profile, Settings, Snapshot, UpdateState } from './types';
 import { journalEntries, maintainer, projectIntro, upstreamRepo, upstreamSite } from './journal';
+import { Glass } from '@samasante/liquid-glass';
+import type { GlassOptics } from '@samasante/liquid-glass';
 
 type Tab = 'overview' | 'profiles' | 'logs' | 'settings' | 'journal';
 const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
@@ -25,6 +27,18 @@ const timeLabel = (value: string) => new Date(value).toLocaleTimeString('zh-CN',
 const dateTimeLabel = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '';
 const errorMessage = (error: unknown) => error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(error);
 const updateLabels = { idle: '尚未检查', checking: '正在检查', 'up-to-date': '已是最新版本', available: '发现新版本', error: '检查未完成' };
+const GLASS_OPTICS: Partial<GlassOptics> = { strength: 0.18, depth: 0.7, curvature: 0.2, dispersion: 0.1, bend: 0.5, bendWidth: 0.16, sheen: 0.55, sheenAngle: 160, frost: 10 };
+const SWITCH_OPTICS: Partial<GlassOptics> = { strength: 0.6, depth: 0.3, curvature: 0.9, dispersion: 0.25, bend: 0.7, bendWidth: 0.3, sheen: 0.9, sheenAngle: 120, frost: 2 };
+// 顶栏是超宽超薄的镜片：折射位移按盒子尺寸比例放大，必须用极低的 strength，避免把下方内容"吸"进玻璃里形成拖影。
+const TOPBAR_OPTICS: Partial<GlassOptics> = { strength: 0.005, depth: 0.6, curvature: 0.15, dispersion: 0, bend: 0.4, bendWidth: 0.16, sheen: 0.55, sheenAngle: 160, frost: 10, specular: 0 };
+
+function AppearanceSlider({ value, disabled, onChange }: { value: 'classic' | 'liquid'; disabled?: boolean; onChange: (value: 'classic' | 'liquid') => void }) {
+  const liquid = value === 'liquid';
+  return <button type="button" role="switch" aria-checked={liquid} aria-label="界面外观：液态玻璃" className={`lg-switch ${liquid ? 'on' : ''}`} disabled={disabled} onClick={() => onChange(liquid ? 'classic' : 'liquid')} onKeyDown={event => {
+    if (event.key === 'ArrowLeft' && liquid) { event.preventDefault(); onChange('classic'); }
+    else if (event.key === 'ArrowRight' && !liquid) { event.preventDefault(); onChange('liquid'); }
+  }}><span className="lg-switch-label">经典</span><span className="lg-switch-label lg-switch-label-liquid">液态玻璃</span><Glass className="lg-switch-thumb" optics={SWITCH_OPTICS}><span /></Glass></button>;
+}
 
 function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean; label: string }) {
   return <button className={`toggle ${checked ? 'on' : ''}`} type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)}><span /></button>;
@@ -150,6 +164,11 @@ export default function App() {
   const announcedVersions = useRef(new Set<string>());
   const checkUpdatePending = useRef(false);
   const exportPending = useRef(false);
+  const [switchFx, setSwitchFx] = useState('');
+  const [navGlider, setNavGlider] = useState<{ top: number; height: number; animated: boolean } | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
+  const navItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const switchFxTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -181,8 +200,25 @@ export default function App() {
     if (snapshot) { setReconnectInterval(String(snapshot.settings.reconnectIntervalSeconds)); setIntervalError(''); }
   }, [snapshot?.settings.reconnectIntervalSeconds]);
   useEffect(() => {
+    document.documentElement.dataset.appearance = snapshot?.settings.appearance ?? 'classic';
+  }, [snapshot?.settings.appearance]);
+  useEffect(() => {
     if (snapshot) setUsername(snapshot.settings.username);
   }, [snapshot?.settings.username]);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const item = navItemRefs.current[tab];
+      if (!item) return;
+      setNavGlider(prev => {
+        const next = { top: item.offsetTop, height: item.offsetHeight, animated: prev !== null };
+        return prev && prev.top === next.top && prev.height === next.height && prev.animated === next.animated ? prev : next;
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [tab, snapshot?.settings.appearance, snapshot?.profiles.length]);
+  useEffect(() => () => { if (switchFxTimer.current) window.clearTimeout(switchFxTimer.current); }, []);
 
   async function action<T>(work: () => Promise<T>, success?: string): Promise<T | undefined> {
     setBusy(true);
@@ -193,6 +229,15 @@ export default function App() {
   async function updateSettings(patch: Partial<Settings>) {
     const result = await action(() => api.saveSettings(patch));
     if (result) setSnapshot(result);
+  }
+  async function changeAppearance(value: 'classic' | 'liquid') {
+    const result = await action(() => api.setAppearance(value));
+    if (result) { setSnapshot(result); playAppearanceFx(value); }
+  }
+  function playAppearanceFx(next: 'classic' | 'liquid') {
+    setSwitchFx(`appearance-enter-${next}`);
+    if (switchFxTimer.current) window.clearTimeout(switchFxTimer.current);
+    switchFxTimer.current = window.setTimeout(() => setSwitchFx(''), 320);
   }
   function openManager() {
     setManageUsername(snapshot?.settings.username ?? '');
@@ -295,19 +340,31 @@ export default function App() {
   const guardLabel = isPreview ? '界面预览' : !snapshot.settings.autoReconnect ? '已关闭' : guardPaused ? '已暂停' : guardActive ? '守护中' : '等待认证';
   const guardSummary = isPreview ? '浏览器仅预览设置，网络守护请使用桌面客户端。' : !snapshot.settings.autoReconnect ? '自动重连已关闭，可随时手动检测或连接。' : guardPaused ? '守护已暂停（手动注销或托盘暂停）；再次连接成功或恢复守护后继续。' : guardActive ? `每 ${snapshot.settings.reconnectIntervalSeconds} 秒检查，确认断线时尝试重连；无可用凭据时提示手动连接。` : connected ? '当前已在线，等待网络守护开始；无可用凭据时需手动连接。' : `自动重连已开启，等待首次成功认证；检测间隔 ${snapshot.settings.reconnectIntervalSeconds} 秒。`;
 
-  return <div className="app-shell">
+  const liquidGlass = snapshot.settings.appearance === 'liquid';
+  const glassHint = liquidGlass ? (snapshot.app.windowGlass ? '，并透视到桌面' : snapshot.app.platform === 'win32' ? '；当前系统不支持桌面透视，已使用应用内玻璃' : '') : '';
+  const sidebarContent = <>
+    <div className="brand"><div className="brand-icon"><Wifi size={25} strokeWidth={2.4} /></div><div><strong>岚连<span className="brand-period">·</span></strong><span className="brand-en">CDUTYB 专版</span></div></div>
+    <div className="workspace-label">你的校园网络空间</div>
+    <nav aria-label="主导航" ref={navRef}>{navGlider && <span className={`nav-glider ${navGlider.animated ? 'animated' : ''}`} aria-hidden="true" style={{ transform: `translateY(${navGlider.top}px)`, height: navGlider.height }} />}{tabs.map(item => <button key={item.id} ref={el => { navItemRefs.current[item.id] = el; }} className={`nav-item ${tab === item.id ? 'active' : ''}`} onClick={() => setTab(item.id)}><item.icon size={19} strokeWidth={1.8} /><span>{item.label}</span>{item.id === 'profiles' && <span className="nav-count">{visibleProfiles.length}</span>}</button>)}</nav>
+    <div className="sidebar-bottom">
+      <div className="sidebar-note"><span className="tiny-orbit"><Sparkles size={18} /></span><strong>连接，从简单开始</strong><p>少一点等待<br />多一点校园的精彩。</p><span className="note-line" /></div>
+      <button className="help-link" onClick={() => setHelp(true)}><CircleHelp size={17} />使用帮助<ExternalLink size={13} /></button>
+      <div className="sidebar-version"><span className="version-dot" />Campus Link <span>v{snapshot.app.version}</span></div>
+    </div>
+  </>;
+  const settingsAppearanceCard = <section className="card settings-card" aria-labelledby="appearance-title">
+    <div className="card-heading"><div className="section-title"><span className="icon-tile"><Palette size={20} /></span><div><h2 id="appearance-title">界面外观</h2><p>经典保持熟悉，液态玻璃带来全新质感</p></div></div><span className={`badge ${liquidGlass ? 'subtle' : 'neutral'}`}>{liquidGlass ? '液态玻璃' : '经典'}</span></div>
+    <div className="settings-row"><div><strong>界面风格</strong><p>默认经典界面；切换到液态玻璃后，侧边栏变为可折射的玻璃面板{glassHint}。</p></div><AppearanceSlider value={snapshot.settings.appearance} disabled={busy} onChange={value => void changeAppearance(value)} /></div>
+  </section>;
+  return <div className={`app-shell${switchFx ? ` ${switchFx}` : ''}`}>
     <aside className="sidebar">
-      <div className="brand"><div className="brand-icon"><Wifi size={25} strokeWidth={2.4} /></div><div><strong>岚连<span className="brand-period">·</span></strong><span className="brand-en">CDUTYB 专版</span></div></div>
-      <div className="workspace-label">你的校园网络空间</div>
-      <nav aria-label="主导航">{tabs.map(item => <button key={item.id} className={`nav-item ${tab === item.id ? 'active' : ''}`} onClick={() => setTab(item.id)}><item.icon size={19} strokeWidth={1.8} /><span>{item.label}</span>{item.id === 'profiles' && <span className="nav-count">{visibleProfiles.length}</span>}{tab === item.id && <span className="nav-indicator" />}</button>)}</nav>
-      <div className="sidebar-bottom">
-        <div className="sidebar-note"><span className="tiny-orbit"><Sparkles size={18} /></span><strong>连接，从简单开始</strong><p>少一点等待<br />多一点校园的精彩。</p><span className="note-line" /></div>
-        <button className="help-link" onClick={() => setHelp(true)}><CircleHelp size={17} />使用帮助<ExternalLink size={13} /></button>
-        <div className="sidebar-version"><span className="version-dot" />Campus Link <span>v{snapshot.app.version}</span></div>
-      </div>
+      {liquidGlass
+        ? <Glass className="lg-panel" optics={GLASS_OPTICS}><div className="lg-panel-inner">{sidebarContent}</div></Glass>
+        : sidebarContent}
     </aside>
 
     <div className="main-shell">
+      {liquidGlass && <Glass className="lg-topbar" optics={TOPBAR_OPTICS}><span /></Glass>}
       <header className="titlebar"><div className="breadcrumb"><span>工作空间</span><ChevronRight size={13} /><strong>{activeTab.label}</strong></div><div className="titlebar-right"><span className={`system-status ${connected ? 'is-online' : ''}`}><span />{isPreview ? '浏览器预览' : `${platformName} 客户端`}</span><span className="titlebar-separator" /><div className="window-controls"><button title="最小化" aria-label="最小化" onClick={() => void api.windowAction('minimize')}><Minus size={15} /></button><button title="最大化或还原" aria-label="最大化或还原" onClick={() => void api.windowAction('maximize')}><Square size={12} /></button><button className="window-close" title="关闭窗口" aria-label="关闭窗口" onClick={() => void api.windowAction('close')}><X size={16} /></button></div></div></header>
       <main>
         <div className="page-heading"><div><div className="eyebrow">{tab === 'overview' ? 'STAY CONNECTED. STAY INSPIRED.' : tab === 'profiles' ? 'A CONNECTION FOR EVERY CAMPUS.' : tab === 'logs' ? 'EVERY CONNECTION, IN SIGHT.' : tab === 'journal' ? 'THE JOURNEY SO FAR.' : 'MAKE YOURSELF AT HOME.'}</div><h1>{tab === 'overview' ? '校园生活，即刻在线' : activeTab.label}<span className="heading-dot">.</span></h1><p>{tab === 'overview' ? '让连接更轻松，把时间留给热爱的事。' : tab === 'profiles' ? '一份轻巧的配置，连接更多校园。' : tab === 'logs' ? '查看认证与应用事件，快速定位连接问题。' : tab === 'journal' ? '版本记录、上游介绍与授权署名。' : '按你的习惯，安排每一次连接。'}</p></div><div className="heading-actions">{tab === 'overview' ? <button className="button secondary small" disabled={inProgress} onClick={() => void action(async () => setSnapshot(await api.checkStatus()))}><RefreshCw size={15} className={state === 'checking' || snapshot.connection.refreshing ? 'spin' : ''} />检测网络</button> : tab === 'profiles' ? <button className="button primary small" disabled={inProgress} onClick={() => void importProfile()}><Upload size={16} />导入连接方案</button> : <span className="heading-symbol"><activeTab.icon size={25} strokeWidth={1.5} /></span>}</div></div>
@@ -375,7 +432,7 @@ export default function App() {
             <div className="journal-list">{journalEntries.map(entry => <div className="journal-entry" key={entry.scope + entry.version}><div className="journal-entry-head"><span className={entry.scope === 'derived' ? 'badge subtle' : 'badge neutral'}>v{entry.version}</span><strong>{entry.title}</strong><span className="journal-date">{entry.date}{entry.scope === 'upstream' ? ' · 上游' : ''}</span></div><ul>{entry.items.map(item => <li key={item}>{item}</li>)}</ul></div>)}</div>
           </section>
         </div>}
-        {tab === 'settings' && <div className="settings-layout"><section className="card settings-card"><div className="card-heading"><div className="section-title"><span className="icon-tile"><Monitor size={20} /></span><div><h2>启动与窗口</h2><p>让岚连 · CDUTYB 专版配合你的使用习惯</p></div></div></div>{[
+        {tab === 'settings' && <div className="settings-layout">{settingsAppearanceCard}<section className="card settings-card"><div className="card-heading"><div className="section-title"><span className="icon-tile"><Monitor size={20} /></span><div><h2>启动与窗口</h2><p>让岚连 · CDUTYB 专版配合你的使用习惯</p></div></div></div>{[
           { key: 'autoLaunch' as const, title: '开机自启动', description: isMac ? '登录 macOS 后自动启动应用。安装版可用。' : '登录系统后自动启动应用。安装版可用。' },
           { key: 'autoConnect' as const, title: '启动后自动连接', description: '需先成功保存账号密码；启动时先检测认证状态。' },
           { key: 'minimizeToTray' as const, title: '关闭时最小化到托盘', description: '点击关闭按钮后在后台保留，可从系统托盘退出。' },

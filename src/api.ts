@@ -2,7 +2,7 @@ import type { CampusAPI, Snapshot } from './types';
 
 export const isPreview = !window.campus;
 const preview: Snapshot = {
-  settings: { profileId: 'builtin-cdut-yibin-ruijie', username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, parameters: {} },
+  settings: { profileId: 'builtin-cdut-yibin-ruijie', username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, appearance: 'classic', parameters: {} },
   hasPassword: false,
   profiles: [
     { id: 'builtin-gzqy', name: '贵州轻工职业大学', description: '基于学校认证页面配置的 Dr.COM 校园网连接方案。', version: '1.0.0', author: 'NingMeng123', homepage: 'http://10.151.253.10/', portalDiscovery: { url: 'http://www.msftconnecttest.com/redirect' }, archived: true, builtin: true, protocol: 'drcom', fields: [{key:'operator',label:'网络类型',default:'1',options:[{label:'校园网',value:'1'}]}] },
@@ -11,13 +11,14 @@ const preview: Snapshot = {
   ],
   connection: { status: 'idle', message: '先连接校园 Wi-Fi 或网线，再进行认证。', monitoring: false, reconnectPaused: false },
   logs: [{ id: 'preview', time: new Date().toISOString(), level: 'info', message: '界面预览已就绪。网络认证及系统设置请使用桌面客户端。' }],
-  app: { version: '1.4.0', platform: 'browser', packaged: false, firstRun: false, secureStorage: false },
+  app: { version: '1.4.0', platform: 'browser', packaged: false, windowGlass: false, firstRun: false, secureStorage: false },
 };
 const desktopOnly = async (): Promise<never> => { throw new Error('此操作需要桌面客户端。请运行 npm run dev 或打开安装后的岚连 · CDUTYB 专版。'); };
 export const api: CampusAPI = window.campus ?? {
   copyText: text => navigator.clipboard.writeText(text),
   getSnapshot: async () => structuredClone(preview),
   saveSettings: desktopOnly,
+  setAppearance: async value => { preview.settings.appearance = value; return structuredClone(preview); },
   saveCredentials: async input => { preview.settings.username = input.username; preview.settings.rememberPassword = true; preview.hasPassword = true; return structuredClone(preview); },
   connect: desktopOnly,
   disconnect: desktopOnly,

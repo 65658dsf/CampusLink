@@ -135,3 +135,10 @@
 .journal-entry ul{margin:8px 0 0;padding-left:16px;font-size:11px;line-height:1.9;color:#5c7a68}
 /* 标题栏吸顶：滚动时保持在窗口顶部，拖拽区不随内容滚走。 */
 .titlebar{position:sticky;top:0;z-index:5}
+/* 导航滑块：激活高亮改为在导航项之间滑动的共享滑块（含右侧指示条）。 */
+nav{position:relative}
+.nav-item.active{background:transparent}
+.nav-glider{position:absolute;left:0;right:0;top:0;border-radius:8px;background:#eaf6f0;pointer-events:none;transition:transform .28s cubic-bezier(.22,1,.36,1),height .28s cubic-bezier(.22,1,.36,1)}
+.nav-glider:not(.animated){transition:none}
+.nav-glider::after{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);height:15px;width:3px;border-radius:3px;background:#259d7b}
+@media (prefers-reduced-motion: reduce){.nav-glider{transition:none}}

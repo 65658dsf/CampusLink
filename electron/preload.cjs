@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('campus', Object.freeze({
   openRelease: invoke('openRelease'),
   copyText: invoke('copyText'),
   saveSettings: invoke('saveSettings'),
+  setAppearance: invoke('setAppearance'),
   saveCredentials: invoke('saveCredentials'),
   connect: invoke('connect'),
   disconnect: invoke('disconnect'),

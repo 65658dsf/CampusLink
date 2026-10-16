@@ -11,8 +11,8 @@ const { UpdateChecker, safeReleaseUrl } = require('./updates.cjs');
 const { buildDiagnosticsReport } = require('./diagnostics-export.cjs');
 const { createNetworkWatcher } = require('./network-watch.cjs');
 
-app.setName('岚连 · CDUTYB 专版');
-app.setAppUserModelId('cn.campuslink.desktop');
+app.setName('岚连 · CDUTYB 专版（液态玻璃版）');
+app.setAppUserModelId('cn.campuslink.glass');
 if (!app.isPackaged && process.env.CAMPUS_LINK_DATA_DIR) app.setPath('userData', path.resolve(process.env.CAMPUS_LINK_DATA_DIR));
 const isPrimary = app.requestSingleInstanceLock();
 let win = null;
@@ -42,6 +42,25 @@ function trusted(event) {
   // A file origin alone is opaque. Pin the exact document and the owned main frame as well.
   return frame.url.split('#')[0] === indexUrl;
 }
+function supportsWindowGlass() {
+  if (process.platform !== 'win32') return false;
+  const build = Number(os.release().split('.')[2] || '0');
+  return build >= 22000;
+}
+function applyWindowGlass() {
+  // 液态玻璃模式在 Win11 22H2+ 使用系统 Acrylic 材质，让侧边栏透视桌面；其余情况回退为应用内玻璃。
+  if (!service) return;
+  const enabled = service.settings.appearance === 'liquid' && supportsWindowGlass();
+  let applied = false;
+  if (win && !win.isDestroyed() && process.platform === 'win32') {
+    try {
+      win.setBackgroundMaterial(enabled ? 'acrylic' : 'none');
+      win.setBackgroundColor(enabled ? '#00000000' : '#f6f7fb');
+      applied = enabled;
+    } catch { applied = false; }
+  }
+  service.appInfo.windowGlass = applied;
+}
 function registerIpc() {
   const handle = (method, handler) => ipcMain.handle(`campus:${method}`, async (event, ...args) => {
     if (!trusted(event)) throw new Error('已拒绝不受信任的页面请求。');
@@ -59,6 +78,12 @@ function registerIpc() {
     const previousProfile = service.settings.profileId;
     const snapshot = service.saveSettings(patch);
     return previousProfile !== service.settings.profileId ? service.checkStatus() : snapshot;
+  });
+  handle('setAppearance', value => {
+    if (value !== 'classic' && value !== 'liquid') throw new Error('界面外观设置无效。');
+    service.setAppearance(value);
+    applyWindowGlass();
+    return service.publish();
   });
   handle('saveCredentials', input => service.setCredentials(input));
   handle('connect', input => service.connect(input));
@@ -250,6 +275,7 @@ function createWindow() {
   win.on('closed', () => { win = null; });
   win.webContents.once('did-finish-load', () => { if (app.isPackaged && !quitting) void updates.check(); });
   if (devUrl) win.loadURL(devUrl.href); else win.loadFile(indexPath);
+  applyWindowGlass();
 }
 
 if (!isPrimary) app.quit();

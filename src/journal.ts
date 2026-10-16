@@ -15,11 +15,13 @@ export const projectIntro = '岚连 Campus Link 是面向 Windows / macOS 的校
 
 export const journalEntries: JournalEntry[] = [
   {
-    version: '1.4.0', scope: 'derived', date: '2026-10-16', title: '密码管理与首启引导',
+    version: '1.4.0', scope: 'derived', date: '2026-10-16', title: '液态玻璃顶栏贯通与体验更新',
     items: [
       '新增明文密码管理与「管理账号密码」入口，一键设置账号密码（不再依赖系统加密）。',
       '连接概览显示当前账号；新增首次启动引导弹窗，可设置账号、密码与断连检测间隔。',
       '检测间隔默认 10 秒；标题栏吸顶，滚动时保持可拖拽。',
+      '液态玻璃改为纯透光材质（无自带底色）；顶部玻璃独立成形、无边框高光并整体收窄，内容在玻璃下方独立滚动。',
+      '侧边栏新增界面外观切换的过场动画；导航选中高亮改为滑块式平滑滑动。',
     ],
   },
   {

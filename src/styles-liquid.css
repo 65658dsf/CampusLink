@@ -1,0 +1,61 @@
+/* 液态玻璃主题：全部覆盖规则以 :root[data-appearance="liquid"] 作用域，经典模式零影响。
+   玻璃镜片材质与折射由 @samasante/liquid-glass 渲染，这里提供底色、氛围与高光细节。 */
+
+:root[data-appearance="liquid"] { background: transparent; }
+:root[data-appearance="liquid"] body { background: transparent; }
+:root[data-appearance="liquid"] .main-shell { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; background: linear-gradient(to bottom, transparent 0 56px, #f5f7f8 56px); }
+:root[data-appearance="liquid"] .app-shell { height: 100vh; overflow: hidden; }
+:root[data-appearance="liquid"] main { width: 100%; margin: 0 auto; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+/* —— 侧边栏：透明容器 + 悬浮玻璃面板（8px 内缩、20px 圆角）——
+   面板规则不加 :root 作用域：这些元素仅在液态模式下渲染，且必须在组件测量前就位，
+   否则库会读到错误的位置/圆角并写入内联样式（时序陷阱）。 */
+:root[data-appearance="liquid"] .sidebar { background: transparent; border-right: 0; padding: 0; }
+.lg-panel { position: absolute; inset: 8px; border-radius: 20px; background: transparent; box-shadow: 0 26px 60px rgba(23, 60, 45, 0.18); overflow: hidden; }
+.lg-panel-inner { display: flex; flex-direction: column; box-sizing: border-box; padding: 26px 10px 10px; height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.lg-panel-inner::-webkit-scrollbar { width: 0; }
+
+/* —— 贯通顶栏：与侧边栏同款玻璃，从侧边栏右缘开始、与侧边栏相接但互不重叠 ——
+   顶区只有一层玻璃（侧边栏区归侧边栏、其余归顶栏）；顶栏四角与侧边栏其余三角一致为圆弧。
+   titlebar 保持透明（无白条/分隔线）；内容在玻璃下方独立滚动，不会滑进玻璃底下。 */
+.lg-topbar { position: fixed; top: 8px; left: 208px; right: 8px; height: 48px; border-radius: 20px; z-index: 4; background: transparent; pointer-events: none; }
+@media(max-width:1120px){ .lg-topbar { left: 177px; } }
+@media(max-width:900px){ .lg-topbar { left: 152px; } }
+@media(max-width:650px){ .lg-topbar { left: 57px; } }
+:root[data-appearance="liquid"] .titlebar { background: transparent; border-bottom: 0; height: 56px; padding-top: 8px; flex-shrink: 0; }
+
+/* —— 面板内的玻璃化细节（保留绿色强调色）—— */
+:root[data-appearance="liquid"] .brand { padding-left: 5px; }
+:root[data-appearance="liquid"] .workspace-label { margin: 40px 0 16px; padding-left: 12px; color: #6d8a7b; }
+:root[data-appearance="liquid"] .nav-item { color: #5d7a6d; border: 1px solid transparent; padding: 14px 15px; }
+:root[data-appearance="liquid"] .nav-item:hover { background: rgba(255, 255, 255, 0.42); border-color: rgba(255, 255, 255, 0.6); color: #2d6b52; }
+:root[data-appearance="liquid"] .nav-item.active { background: transparent; border-color: transparent; color: #14806a; box-shadow: none; }
+:root[data-appearance="liquid"] .nav-glider { background: rgba(255, 255, 255, 0.64); border: 1px solid rgba(255, 255, 255, 0.85); box-shadow: 0 8px 20px rgba(24, 90, 66, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+:root[data-appearance="liquid"] .nav-count { background: rgba(255, 255, 255, 0.5); color: #5f8271; }
+:root[data-appearance="liquid"] .active .nav-count { background: rgba(196, 236, 217, 0.85); }
+:root[data-appearance="liquid"] .sidebar-note { background: rgba(255, 255, 255, 0.4); border-color: rgba(255, 255, 255, 0.65); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+:root[data-appearance="liquid"] .sidebar-note strong { color: #3f6b57; }
+:root[data-appearance="liquid"] .sidebar-note p { color: #6d8a7b; }
+:root[data-appearance="liquid"] .note-line, :root[data-appearance="liquid"] .note-line:after { border-color: rgba(255, 255, 255, 0.5); }
+:root[data-appearance="liquid"] .help-link { color: #5f7a6d; }
+:root[data-appearance="liquid"] .help-link svg:last-child { color: #7d958a; }
+:root[data-appearance="liquid"] .sidebar-version { border-top-color: rgba(255, 255, 255, 0.6); color: #6d8a7d; }
+:root[data-appearance="liquid"] .sidebar-version > span:last-child { color: #7d968a; }
+
+/* —— iOS 风格液态玻璃滑块（应用设置「界面外观」）—— */
+.lg-switch { position: relative; display: inline-flex; align-items: center; width: 148px; height: 34px; padding: 3px; border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 17px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(233, 244, 239, 0.55)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 6px 16px rgba(31, 84, 61, 0.14); backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5); overflow: hidden; flex-shrink: 0; }
+.lg-switch-label { position: relative; z-index: 2; flex: 1 1 0; text-align: center; font-size: 10px; letter-spacing: 0.5px; color: #7d9186; transition: color 0.2s; pointer-events: none; }
+.lg-switch.on .lg-switch-label-liquid, .lg-switch:not(.on) .lg-switch-label:not(.lg-switch-label-liquid) { color: #12735a; font-weight: 600; }
+.lg-switch-thumb { position: absolute !important; z-index: 1; top: 3px; left: 3px; width: 71px; height: 26px; border-radius: 13px; background: rgba(255, 255, 255, 0.66); box-shadow: 0 3px 10px rgba(23, 77, 55, 0.22), inset 0 1px 0 rgba(255, 255, 255, 1); transition: transform 0.28s cubic-bezier(0.3, 1.35, 0.4, 1); pointer-events: none; }
+.lg-switch.on .lg-switch-thumb { transform: translateX(71px); }
+
+/* —— 界面外观切换过场动画（仅手动切换时由临时类触发）—— */
+.appearance-enter-liquid .lg-panel, .appearance-enter-liquid .lg-topbar { animation: lg-enter-in 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.appearance-enter-classic .sidebar { animation: lg-enter-fade 0.22s ease-out; }
+@keyframes lg-enter-in { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
+@keyframes lg-enter-fade { from { opacity: 0.4; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-switch-thumb { transition: none; }
+  .appearance-enter-liquid .lg-panel, .appearance-enter-liquid .lg-topbar, .appearance-enter-classic .sidebar { animation: none; }
+}
