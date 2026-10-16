@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, EthernetPort, ExternalLink, Eye, EyeOff, FileJson2, GraduationCap, LayoutDashboard, LoaderCircle, LockKeyhole, Minus, Monitor, MoreHorizontal, Network, Power, Puzzle, Radio, RefreshCw, Settings2, ShieldCheck, Sparkles, Square, Terminal, Trash2, Upload, Wifi, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3, Copy, EthernetPort, ExternalLink, Eye, EyeOff, FileJson2, GraduationCap, LayoutDashboard, LoaderCircle, LockKeyhole, Minus, Monitor, MoreHorizontal, Network, Power, Puzzle, Radio, RefreshCw, Settings2, ShieldCheck, Sparkles, Square, Terminal, Trash2, Upload, Wifi, X, FileText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api, isPreview } from './api';
 import type { LogEntry, Profile, Settings, Snapshot } from './types';
+import { journalEntries, maintainer, projectIntro, upstreamRepo, upstreamSite } from './journal';
 
-type Tab = 'overview' | 'profiles' | 'logs' | 'settings';
+type Tab = 'overview' | 'profiles' | 'logs' | 'settings' | 'journal';
 const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: '连接概览', icon: LayoutDashboard },
   { id: 'profiles', label: '连接方案', icon: Puzzle },
   { id: 'logs', label: '活动日志', icon: Terminal },
   { id: 'settings', label: '应用设置', icon: Settings2 },
+  { id: 'journal', label: '开发日志', icon: FileText },
 ];
 const statusLabels = { idle: '等待连接', checking: '正在检测', connecting: '正在连接', connected: '已登录校园网', disconnecting: '正在注销', error: '连接需要处理' };
 const levelLabels = { info: '信息', success: '成功', warning: '提醒', error: '错误' };
@@ -98,7 +100,7 @@ export default function App() {
   const [logFilter, setLogFilter] = useState('all');
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [inspectedLog, setInspectedLog] = useState<LogEntry | null>(null);
-  const [reconnectInterval, setReconnectInterval] = useState('30');
+  const [reconnectInterval, setReconnectInterval] = useState('10');
   const [intervalError, setIntervalError] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
@@ -181,7 +183,7 @@ export default function App() {
   const guardActive = !isPreview && snapshot.settings.autoReconnect && snapshot.connection.monitoring && !snapshot.connection.reconnectPaused;
   const guardPaused = !isPreview && snapshot.settings.autoReconnect && snapshot.connection.reconnectPaused;
   const guardLabel = isPreview ? '界面预览' : !snapshot.settings.autoReconnect ? '已关闭' : guardPaused ? '已暂停' : guardActive ? '守护中' : '等待认证';
-  const guardSummary = isPreview ? '浏览器仅预览设置，网络守护请使用桌面客户端。' : !snapshot.settings.autoReconnect ? '自动重连已关闭，可随时手动检测或连接。' : guardPaused ? '手动注销后已暂停；再次连接成功后恢复守护。' : guardActive ? `每 ${snapshot.settings.reconnectIntervalSeconds} 秒检查，确认断线时尝试重连；无可用凭据时提示手动连接。` : connected ? '当前已在线，等待网络守护开始；无可用凭据时需手动连接。' : `自动重连已开启，等待首次成功认证；检测间隔 ${snapshot.settings.reconnectIntervalSeconds} 秒。`;
+  const guardSummary = isPreview ? '浏览器仅预览设置，网络守护请使用桌面客户端。' : !snapshot.settings.autoReconnect ? '自动重连已关闭，可随时手动检测或连接。' : guardPaused ? '守护已暂停（手动注销或托盘暂停）；再次连接成功或恢复守护后继续。' : guardActive ? `每 ${snapshot.settings.reconnectIntervalSeconds} 秒检查，确认断线时尝试重连；无可用凭据时提示手动连接。` : connected ? '当前已在线，等待网络守护开始；无可用凭据时需手动连接。' : `自动重连已开启，等待首次成功认证；检测间隔 ${snapshot.settings.reconnectIntervalSeconds} 秒。`;
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -198,7 +200,7 @@ export default function App() {
     <div className="main-shell">
       <header className="titlebar"><div className="breadcrumb"><span>工作空间</span><ChevronRight size={13} /><strong>{activeTab.label}</strong></div><div className="titlebar-right"><span className={`system-status ${connected ? 'is-online' : ''}`}><span />{isPreview ? '浏览器预览' : `${platformName} 客户端`}</span><span className="titlebar-separator" /><div className="window-controls"><button title="最小化" aria-label="最小化" onClick={() => void api.windowAction('minimize')}><Minus size={15} /></button><button title="最大化或还原" aria-label="最大化或还原" onClick={() => void api.windowAction('maximize')}><Square size={12} /></button><button className="window-close" title="关闭窗口" aria-label="关闭窗口" onClick={() => void api.windowAction('close')}><X size={16} /></button></div></div></header>
       <main>
-        <div className="page-heading"><div><div className="eyebrow">{tab === 'overview' ? 'STAY CONNECTED. STAY INSPIRED.' : tab === 'profiles' ? 'A CONNECTION FOR EVERY CAMPUS.' : tab === 'logs' ? 'EVERY CONNECTION, IN SIGHT.' : 'MAKE YOURSELF AT HOME.'}</div><h1>{tab === 'overview' ? '校园生活，即刻在线' : activeTab.label}<span className="heading-dot">.</span></h1><p>{tab === 'overview' ? '让连接更轻松，把时间留给热爱的事。' : tab === 'profiles' ? '一份轻巧的配置，连接更多校园。' : tab === 'logs' ? '查看认证与应用事件，快速定位连接问题。' : '按你的习惯，安排每一次连接。'}</p></div><div className="heading-actions">{tab === 'overview' ? <button className="button secondary small" disabled={inProgress} onClick={() => void action(async () => setSnapshot(await api.checkStatus()))}><RefreshCw size={15} className={state === 'checking' || snapshot.connection.refreshing ? 'spin' : ''} />检测网络</button> : tab === 'profiles' ? <button className="button primary small" disabled={inProgress} onClick={() => void importProfile()}><Upload size={16} />导入连接方案</button> : <span className="heading-symbol"><activeTab.icon size={25} strokeWidth={1.5} /></span>}</div></div>
+        <div className="page-heading"><div><div className="eyebrow">{tab === 'overview' ? 'STAY CONNECTED. STAY INSPIRED.' : tab === 'profiles' ? 'A CONNECTION FOR EVERY CAMPUS.' : tab === 'logs' ? 'EVERY CONNECTION, IN SIGHT.' : tab === 'journal' ? 'THE JOURNEY SO FAR.' : 'MAKE YOURSELF AT HOME.'}</div><h1>{tab === 'overview' ? '校园生活，即刻在线' : activeTab.label}<span className="heading-dot">.</span></h1><p>{tab === 'overview' ? '让连接更轻松，把时间留给热爱的事。' : tab === 'profiles' ? '一份轻巧的配置，连接更多校园。' : tab === 'logs' ? '查看认证与应用事件，快速定位连接问题。' : tab === 'journal' ? '版本记录、上游介绍与授权署名。' : '按你的习惯，安排每一次连接。'}</p></div><div className="heading-actions">{tab === 'overview' ? <button className="button secondary small" disabled={inProgress} onClick={() => void action(async () => setSnapshot(await api.checkStatus()))}><RefreshCw size={15} className={state === 'checking' || snapshot.connection.refreshing ? 'spin' : ''} />检测网络</button> : tab === 'profiles' ? <button className="button primary small" disabled={inProgress} onClick={() => void importProfile()}><Upload size={16} />导入连接方案</button> : <span className="heading-symbol"><activeTab.icon size={25} strokeWidth={1.5} /></span>}</div></div>
 
         {isPreview && <div className="preview-notice"><Monitor size={15} /><span>正在预览界面 · 网络认证、密码保存与开机自启动请在桌面客户端中使用。</span></div>}
 
@@ -214,7 +216,7 @@ export default function App() {
                 <div className={`session-notice ${connected ? 'verified' : 'unconfirmed'}`} role="status">{connected ? <CheckCheck size={23} /> : inProgress ? <LoaderCircle size={23} className="spin" /> : <CircleHelp size={23} />}<p>{connected ? '已检测到当前设备通过校园网认证，无需再次登录。' : snapshot.connection.message}</p></div>
                 <dl className="session-details"><div><dt>所属校园</dt><dd>{profile?.name}</dd></div><div><dt>认证状态</dt><dd className={connected ? 'session-status' : ''}>{connected ? <><span />已登录</> : state === 'disconnecting' ? '正在注销' : state === 'checking' ? '正在检查' : '待确认'}</dd></div>{detectedPortalOrigin && <div><dt>认证入口</dt><dd title={detectedPortalOrigin}>{detectedPortalOrigin}</dd></div>}{snapshot.connection.ip && <div><dt>设备 IP</dt><dd>{snapshot.connection.ip}</dd></div>}{snapshot.connection.checkedAt && <div><dt>上次检查</dt><dd>{timeLabel(snapshot.connection.checkedAt)}</dd></div>}</dl>
                 <div className="session-actions"><button type="button" className="button secondary" disabled={inProgress} onClick={() => void action(async () => setSnapshot(await api.checkStatus()))}><RefreshCw size={16} className={state === 'checking' || snapshot.connection.refreshing ? 'spin' : ''} />刷新状态</button><button type="button" className="button disconnect-button" disabled={inProgress} onClick={() => void action(async () => setSnapshot(await api.disconnect()))}>{state === 'disconnecting' ? <LoaderCircle size={16} className="spin" /> : <Power size={16} />}{state === 'disconnecting' ? '正在注销…' : '注销校园网'}</button></div>
-                <p className="session-footnote">手动注销会暂停自动重连，再次连接成功后恢复守护。</p>
+                <p className="session-footnote">手动注销或托盘暂停会停止自动重连；再次连接成功或“恢复守护”后继续。</p>
               </> : state === 'checking' ? <div className="auth-checking" role="status"><span className="auth-checking-icon"><LoaderCircle size={28} className="spin" /></span><h2>正在检查登录状态</h2><p>正在向校园网确认当前设备是否已认证。<br />已登录时会自动显示在线状态。</p><span>{profile?.name}</span></div> : <>
               <div className="card-heading"><div className="section-title"><span className="icon-tile"><GraduationCap size={20} /></span><div><h2>连接校园网</h2><p>选择学校，输入你的认证信息</p></div></div><span className="step-label">01 / CONNECT</span></div>
               <form onSubmit={event => { event.preventDefault(); void connect(); }}>
@@ -245,6 +247,22 @@ export default function App() {
 
         {tab === 'logs' && <section className="card full-log-card"><div className="compact-heading"><h2><Terminal size={18} />运行记录<span className="count-label">{snapshot.logs.length}</span></h2><div className="log-toolbar"><select aria-label="筛选日志" value={logFilter} onChange={event => setLogFilter(event.target.value)}><option value="all">全部类型</option><option value="info">信息</option><option value="success">成功</option><option value="warning">提醒</option><option value="error">错误</option></select><button className="button secondary small" onClick={() => void action(async () => { await api.copyText(filteredLogs.map(entry => `[${entry.time}] [${levelLabels[entry.level]}] ${entry.message}`).join('\n')); }, '日志已复制。')}><Copy size={14} />复制日志</button></div></div><div className="log-list">{filteredLogs.length ? filteredLogs.map(entry => <LogRow entry={entry} key={entry.id} onInspect={setInspectedLog} />) : <div className="empty-state"><Terminal size={36} strokeWidth={1.3} /><h3>这里还很安静</h3><p>符合筛选条件的活动会显示在这里。</p></div>}</div><div className="log-footer"><ShieldCheck size={14} />日志不记录密码，记录保留在当前会话中。</div></section>}
 
+        {tab === 'journal' && <div className="settings-layout">
+          <section className="card settings-card">
+            <div className="card-heading"><div className="section-title"><span className="icon-tile"><FileText size={20} /></span><div><h2>关于上游项目</h2><p>本应用的原点</p></div></div><span className="badge subtle">经授权衍生</span></div>
+            <div className="settings-row"><div><strong>岚连 Campus Link</strong><p>{projectIntro}</p><p className="about-detail">上游仓库：{upstreamRepo} · 官网：{upstreamSite}</p></div><div className="journal-actions"><button className="button secondary small" onClick={() => void action(() => api.openUrl(upstreamRepo), '已在浏览器中打开上游仓库。')}><ExternalLink size={14} />打开上游仓库</button></div></div>
+          </section>
+          <section className="card settings-card">
+            <div className="card-heading"><div className="section-title"><span className="icon-tile"><ShieldCheck size={20} /></span><div><h2>授权与署名</h2><p>授权说明与维护者</p></div></div></div>
+            <div className="settings-row"><div><strong>原作者</strong><p>NingMeng123 · 岚连 · Campus Link；2026-10-16 经确认获得完整修改与分发授权。</p></div></div>
+            <div className="settings-row"><div><strong>本专版开发与适配</strong><p>{maintainer.name} · {maintainer.email}</p></div><button className="button secondary small" onClick={() => void action(() => api.copyText(maintainer.email), '反馈邮箱已复制。')}><Copy size={14} />复制反馈邮箱</button></div>
+            <div className="settings-row"><div><strong>许可</strong><p>本仓库以 MIT 许可发布；上游与第三方许可（scu_net_auto_login 等）按原文保留。</p></div></div>
+          </section>
+          <section className="card settings-card">
+            <div className="card-heading"><div className="section-title"><span className="icon-tile"><Clock3 size={20} /></span><div><h2>版本记录</h2><p>最近几次更新（新 → 旧）</p></div></div></div>
+            <div className="journal-list">{journalEntries.map(entry => <div className="journal-entry" key={entry.scope + entry.version}><div className="journal-entry-head"><span className={entry.scope === 'derived' ? 'badge subtle' : 'badge neutral'}>v{entry.version}</span><strong>{entry.title}</strong><span className="journal-date">{entry.date}{entry.scope === 'upstream' ? ' · 上游' : ''}</span></div><ul>{entry.items.map(item => <li key={item}>{item}</li>)}</ul></div>)}</div>
+          </section>
+        </div>}
         {tab === 'settings' && <div className="settings-layout"><section className="card settings-card"><div className="card-heading"><div className="section-title"><span className="icon-tile"><Monitor size={20} /></span><div><h2>启动与窗口</h2><p>让岚连 · CDUTYB 专版配合你的使用习惯</p></div></div></div>{[
           { key: 'autoLaunch' as const, title: '开机自启动', description: isMac ? '登录 macOS 后自动启动应用。安装版可用。' : '登录系统后自动启动应用。安装版可用。' },
           { key: 'autoConnect' as const, title: '启动后自动连接', description: '需先成功保存账号密码；启动时先检测认证状态。' },
@@ -258,10 +276,10 @@ export default function App() {
             <div className="card-heading"><div className="section-title"><span className="icon-tile"><Radio size={20} /></span><div><h2 id="guard-title">网络守护</h2><p>成功连接后定期检查，确认断线时尝试恢复</p></div></div><span className={`badge ${guardActive ? 'subtle' : 'neutral'}`}>{guardLabel}</span></div>
             <div className="settings-row"><div><strong>断线自动重连</strong><p>使用本次连接的认证信息或已保存密码；无可用凭据时提示手动连接。</p></div><Toggle label="断线自动重连" checked={snapshot.settings.autoReconnect} disabled={inProgress} onChange={value => void updateSettings({ autoReconnect: value })} /></div>
             <form className="settings-row interval-settings" noValidate onSubmit={event => { event.preventDefault(); void saveReconnectInterval(); }}>
-              <div><label className="settings-field-label" htmlFor="reconnect-interval">检测间隔（秒）</label><p id="reconnect-interval-help">5–3600 秒，默认 30 秒。保存后应用新的检查间隔。</p></div>
+              <div><label className="settings-field-label" htmlFor="reconnect-interval">检测间隔（秒）</label><p id="reconnect-interval-help">5–3600 秒，默认 10 秒。保存后应用新的检查间隔。</p></div>
               <div className="interval-editor"><div className="interval-controls"><input id="reconnect-interval" type="number" inputMode="numeric" min={5} max={3600} step={1} value={reconnectInterval} disabled={inProgress} aria-invalid={Boolean(intervalError)} aria-describedby={intervalError ? 'reconnect-interval-help reconnect-interval-error' : 'reconnect-interval-help'} onChange={event => { setReconnectInterval(event.target.value); setIntervalError(''); }} /><button className="button secondary small" type="submit" disabled={inProgress || reconnectInterval === String(snapshot.settings.reconnectIntervalSeconds)}>保存间隔</button></div>{intervalError && <p className="field-error" id="reconnect-interval-error" role="alert">{intervalError}</p>}</div>
             </form>
-            <div className={`guard-status ${guardActive ? 'active' : guardPaused ? 'paused' : ''}`}><ShieldCheck size={16} /><p>{guardSummary}<span>手动注销会暂停守护，再次连接成功后恢复。服务器暂不可达时不会把状态未知当作断线。</span></p></div>
+            <div className={`guard-status ${guardActive ? 'active' : guardPaused ? 'paused' : ''}`}><ShieldCheck size={16} /><p>{guardSummary}<span>手动注销或托盘暂停都会停止守护；再次连接成功或“恢复守护”后继续。服务器暂不可达时不会把状态未知当作断线。</span></p></div>
           </section><section className="card settings-card"><div className="card-heading"><div className="section-title"><span className="icon-tile"><LockKeyhole size={20} /></span><div><h2>账号与隐私</h2><p>凭据由你掌控</p></div></div><span className={`badge ${snapshot.app.secureStorage ? 'subtle' : 'neutral'}`}>{snapshot.app.secureStorage ? '系统加密可用' : '系统加密不可用'}</span></div><div className="settings-row"><div><strong>本地保存的密码</strong><p>{snapshot.hasPassword ? '已加密保存。清除后，自动连接也会关闭。' : '暂未保存密码，可在连接页面勾选「记住密码」。'}</p></div><button className="button secondary small" disabled={inProgress || !snapshot.hasPassword} onClick={() => void action(async () => { const value = await api.clearCredentials(); setSnapshot(value); setPassword(''); setRemember(false); }, '本地密码已清除，自动连接已关闭。')}><Trash2 size={14} />清除密码</button></div></section><section className="about-card"><div className="brand-icon"><Wifi size={28} /></div><div><h2>岚连 · CDUTYB 专版</h2><p>面向成都理工大学（宜宾校区）的校园网连接工具 · v{snapshot.app.version}</p><p className="about-detail">{snapshot.app.packaged ? `${platformName} 安装版` : isPreview ? '浏览器预览' : '开发模式'} · 基于 NingMeng123 的 Campus Link 构建 · 独立辅助工具</p></div><button className="text-button" onClick={() => setHelp(true)}>使用帮助<ArrowRight size={15} /></button></section></div>}
 
         <footer className="page-footer"><span><span className="footer-mark">⌁</span> 简单连接，自在校园。</span><span>MADE FOR YOUR CAMPUS <span className="footer-dot">✦</span></span></footer>

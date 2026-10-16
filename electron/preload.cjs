@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('campus', Object.freeze({
   exportExample: invoke('exportExample'),
   exportDiagnostics: invoke('exportDiagnostics'),
   openPortal: invoke('openPortal'),
+  openUrl: invoke('openUrl'),
   clearCredentials: invoke('clearCredentials'),
   windowAction: invoke('windowAction'),
   onSnapshot(callback) {

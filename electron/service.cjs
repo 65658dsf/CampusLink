@@ -8,7 +8,7 @@ const { builtinProfiles, defaultProfile, publicProfile, validateProfile, parsePr
 const { runOperation } = require('./adapters.cjs');
 const { CampusError } = require('./transport.cjs');
 
-const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 30, minimizeToTray: true, parameters: profileParameters(defaultProfile) });
+const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, parameters: profileParameters(defaultProfile) });
 const IDLE = () => ({ status: 'idle', message: '准备就绪，连接校园网络后即可认证。' });
 
 class CampusService extends EventEmitter {
@@ -313,6 +313,16 @@ class CampusService extends EventEmitter {
     if (this.monitoring()) return this.monitorTick();
     if (!this.settings.autoReconnect || this.reconnectPaused) return this.snapshot();
     return this.checkStatus({ silent: true });
+  }
+  setGuardPaused(paused) {
+    // 托盘快捷开关：暂停只停止定时检测与自动重连，不注销当前会话。
+    if (this.disposed) return this.snapshot();
+    if (typeof paused !== 'boolean') throw new Error('守护状态无效。');
+    if (paused === this.reconnectPaused) return this.snapshot();
+    this.reconnectPaused = paused;
+    if (paused) this.stopMonitoring();
+    else if (this.settings.autoReconnect && this.connection.status === 'connected') this.armMonitoring();
+    return this.publish();
   }
   importProfile(text) {
     this.assertIdle();

@@ -26,6 +26,7 @@ export const api: CampusAPI = window.campus ?? {
   exportExample: desktopOnly,
   exportDiagnostics: desktopOnly,
   openPortal: desktopOnly,
+  openUrl: async url => { window.open(url, '_blank', 'noopener'); },
   clearCredentials: desktopOnly,
   windowAction: async () => {},
   onSnapshot: () => () => {},
