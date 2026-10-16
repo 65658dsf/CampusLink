@@ -9,7 +9,7 @@ const { MAX_PROFILE_BYTES, safeUrl, parseProfile } = require('./profiles.cjs');
 const { buildDiagnosticsReport } = require('./diagnostics-export.cjs');
 const { createNetworkWatcher } = require('./network-watch.cjs');
 
-app.setName('岚连 · Campus Link');
+app.setName('岚连 · CDUTYB 专版');
 app.setAppUserModelId('cn.campuslink.desktop');
 if (!app.isPackaged && process.env.CAMPUS_LINK_DATA_DIR) app.setPath('userData', path.resolve(process.env.CAMPUS_LINK_DATA_DIR));
 const isPrimary = app.requestSingleInstanceLock();
@@ -124,15 +124,15 @@ function trayAction(action) {
 function updateTray(snapshot) {
   if (!tray || tray.isDestroyed()) return;
   const busy = snapshot.connection.refreshing || ['checking', 'connecting', 'disconnecting'].includes(snapshot.connection.status);
-  tray.setToolTip(`岚连 · ${snapshot.connection.status === 'connected' ? '校园网已连接' : '校园网连接工具'}`);
+  tray.setToolTip(`岚连 · CDUTYB 专版 · ${snapshot.connection.status === 'connected' ? '校园网已连接' : '校园网连接工具'}`);
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开岚连', click: showWindow },
+    { label: '打开岚连 · CDUTYB 专版', click: showWindow },
     { type: 'separator' },
     { label: '查询认证状态', enabled: !busy, click: () => trayAction(() => service.checkStatus()) },
     { label: '连接校园网', enabled: !busy && !snapshot.connection.canDisconnect && snapshot.hasPassword, click: () => trayAction(() => service.connect({})) },
     { label: '断开认证', enabled: !busy && snapshot.connection.canDisconnect, click: () => trayAction(() => service.disconnect()) },
     { type: 'separator' },
-    { label: '退出岚连', click: () => { quitting = true; app.quit(); } },
+    { label: '退出岚连 · CDUTYB 专版', click: () => { quitting = true; app.quit(); } },
   ]));
 }
 function configureSession() {
@@ -149,7 +149,7 @@ function configureSession() {
 function createWindow() {
   win = new BrowserWindow({
     width: 1260, height: 850, minWidth: 1000, minHeight: 720, show: false, frame: false,
-    title: '岚连 · Campus Link', backgroundColor: '#f6f7fb', icon: iconImage(),
+    title: '岚连 · CDUTYB 专版', backgroundColor: '#f6f7fb', icon: iconImage(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, spellcheck: false, devTools: !app.isPackaged },
   });
   if (process.platform !== 'darwin') win.setMenu(null);
@@ -176,6 +176,16 @@ else {
   app.on('window-all-closed', () => { if (!tray || quitting) app.quit(); });
   app.on('activate', showWindow);
   app.whenReady().then(() => {
+    // 产品改名后 userData 目录会变化：首次启动时把旧目录的 settings.json 迁移过来，
+    // 保留账号、方案与偏好；旧目录保留不删，便于回滚。
+    try {
+      const settingsFile = path.join(app.getPath('userData'), 'settings.json');
+      const legacyFile = path.join(app.getPath('appData'), '岚连 · Campus Link', 'settings.json');
+      if (!fs.existsSync(settingsFile) && fs.existsSync(legacyFile)) {
+        fs.mkdirSync(app.getPath('userData'), { recursive: true });
+        fs.copyFileSync(legacyFile, settingsFile);
+      }
+    } catch { /* 迁移失败不阻止启动；应用会以默认设置运行 */ }
     service = new CampusService({
       directory: app.getPath('userData'), safeStorage, version: app.getVersion(), packaged: app.isPackaged,
       autoLaunch: enabled => {
@@ -202,7 +212,7 @@ else {
     void service.initialize().catch(() => service.log('warning', '启动状态检查未完成，请点击检测网络重试。'));
     powerMonitor.on('resume', () => { void service.refreshStatus().catch(() => {}); });
   }).catch(() => {
-    dialog.showErrorBox('岚连启动失败', '无法初始化校园网连接工具，请重新安装或检查应用数据目录权限。');
+    dialog.showErrorBox('岚连 · CDUTYB 专版启动失败', '无法初始化校园网连接工具，请重新安装或检查应用数据目录权限。');
     quitting = true; app.quit();
   });
 }

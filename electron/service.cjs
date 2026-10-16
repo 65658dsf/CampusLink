@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { randomUUID } = require('node:crypto');
-const { builtinProfile, builtinProfiles, publicProfile, validateProfile, parseProfile, profileParameters, keys } = require('./profiles.cjs');
+const { builtinProfiles, defaultProfile, publicProfile, validateProfile, parseProfile, profileParameters, keys } = require('./profiles.cjs');
 const { runOperation } = require('./adapters.cjs');
 const { CampusError } = require('./transport.cjs');
 
-const defaults = () => ({ profileId: builtinProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 30, minimizeToTray: true, parameters: { operator: '1' } });
+const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 30, minimizeToTray: true, parameters: profileParameters(defaultProfile) });
 const IDLE = () => ({ status: 'idle', message: '准备就绪，连接校园网络后即可认证。' });
 
 class CampusService extends EventEmitter {
@@ -42,7 +42,7 @@ class CampusService extends EventEmitter {
     this.logs = [];
     this.appInfo = { version, platform, packaged, secureStorage: this.storageAvailable() };
     this.load();
-    this.log('info', '岚连已就绪，首次连接按启动偏好执行；确认在线后可按设置检测并自动重连。', false);
+    this.log('info', '岚连 · CDUTYB 专版已就绪，首次连接按启动偏好执行；确认在线后可按设置检测并自动重连。', false);
   }
   storageAvailable() {
     try { return Boolean(this.safeStorage?.isEncryptionAvailable()) && this.safeStorage.getSelectedStorageBackend?.() !== 'basic_text'; } catch { return false; }
@@ -327,7 +327,7 @@ class CampusService extends EventEmitter {
     this.profile(id);
     if (this.session?.profileId === id || (this.connection.status === 'connected' && this.settings.profileId === id)) throw new Error('请先断开当前认证，再移除方案。');
     this.externalProfiles = this.externalProfiles.filter(p => p.id !== id);
-    if (this.settings.profileId === id) { this.stopMonitoring(); this.reconnectContext = null; this.settings = { ...this.settings, profileId: builtinProfile.id, parameters: { operator: '1' }, autoConnect: false }; this.credential = null; this.connection = IDLE(); }
+    if (this.settings.profileId === id) { this.stopMonitoring(); this.reconnectContext = null; this.settings = { ...this.settings, profileId: defaultProfile.id, parameters: profileParameters(defaultProfile), autoConnect: false }; this.credential = null; this.connection = IDLE(); }
     this.persist(); this.log('info', '外部连接方案已移除。'); return this.snapshot();
   }
   clearCredentials() {

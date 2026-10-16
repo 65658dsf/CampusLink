@@ -6,7 +6,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parseProfile, validateProfile, builtinProfile: builtinDrcomProfile, builtinProfiles, MAX_PROFILE_BYTES } = require('../electron/profiles.cjs');
+const { parseProfile, validateProfile, builtinProfile: builtinDrcomProfile, builtinProfiles, defaultProfile, MAX_PROFILE_BYTES } = require('../electron/profiles.cjs');
 // Keep legacy Dr.COM protocol fixtures fixed to their mocked authentication host.
 const builtinProfile = structuredClone(builtinDrcomProfile);
 delete builtinProfile.portalDiscovery;
@@ -235,7 +235,7 @@ test('import supports portable declarative profiles and protects built-in and du
   service.saveSettings({ profileId: example.id });
   assert.equal(service.snapshot().settings.parameters.operator, 'campus');
   service.removeProfile(example.id);
-  assert.equal(service.snapshot().settings.profileId, builtinProfile.id);
+  assert.equal(service.snapshot().settings.profileId, defaultProfile.id);
 });
 test('unavailable secure storage prevents remembering and startup registration errors propagate', t => {
   const service = serviceFixture(t, undefined, { safeStorage: { isEncryptionAvailable: () => false }, autoLaunch: () => { throw new Error('开发预览不注册开机自启动'); } });

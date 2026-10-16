@@ -61,7 +61,7 @@
 
 ## 保存位置
 
-Windows 配置存放在 Electron `app.getPath('userData')` 对应的 `settings.json`，通常是 `%APPDATA%\岚连 · Campus Link\settings.json`。配置包含账号、偏好、外部方案和可选加密密码。密码通过 Electron `safeStorage` 使用 Windows DPAPI 加密，不以明文写盘；关闭「记住密码」或点击「清除已保存密码」会移除已保存密码并关闭自动连接。
+Windows 配置存放在 Electron `app.getPath('userData')` 对应的 `settings.json`，通常是 `%APPDATA%\岚连 · CDUTYB 专版\settings.json`（从旧版本升级时首次启动自动迁移）。配置包含账号、偏好、外部方案和可选加密密码。密码通过 Electron `safeStorage` 使用 Windows DPAPI 加密，不以明文写盘；关闭「记住密码」或点击「清除已保存密码」会移除已保存密码并关闭自动连接。
 
 开机自启动只在 Windows 打包版中注册当前应用，不会在开发模式下注册 Electron 开发工具。自启动与启动后自动认证是两个独立开关；自动认证必须主动开启并已保存密码，启动时会先检查状态，已在线则跳过认证，状态查询失败也不盲目提交密码。关闭应用不会自动注销校园网；如需退出认证，请先点「断开」。
 

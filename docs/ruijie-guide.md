@@ -2,7 +2,7 @@
 
 开发者：**NingMeng123** · [GitHub](https://github.com/65658dsf/CampusLink)
 
-本教程适用于**锐捷 ePortal Web 网页认证**。岚连保留原有贵州轻工职业大学 Dr.COM 默认方案，新增独立的四川大学锐捷方案，并允许导入其他学校的锐捷 JSON 配置。v1.1.1 支持优先从当前网络探测真实认证入口；方案只描述参数，不执行导入文件中的脚本。
+本教程适用于**锐捷 ePortal Web 网页认证**。岚连 · CDUTYB 专版默认内置成都理工大学（宜宾校区）锐捷方案；贵州轻工职业大学（Dr.COM）与四川大学方案保留在代码中、默认折叠显示；其他学校可导入锐捷 JSON 配置。认证入口优先从当前网络探测；方案只描述参数，不执行导入文件中的脚本。
 
 四川大学配置来自公开源码对照；当前没有在四川大学真实校园网进行登录、注销或重连验收。本机模拟服务可检查请求、编码和状态处理，但不能证明学校当前部署接受这些参数。
 
@@ -146,7 +146,7 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 
 将最后的文件路径替换成自己的配置。此命令不会请求学校服务器；示例占位地址和示例密钥也能通过结构检查，必须先替换为真实参数才能使用。
 
-1. 打开岚连“连接方案 → 导入连接方案”，选择 UTF-8 JSON。核对导入提示中的学校、来源与服务，导入本身不会提交账号密码。
+1. 打开岚连 · CDUTYB 专版“连接方案 → 导入连接方案”，选择 UTF-8 JSON。核对导入提示中的学校、来源与服务，导入本身不会提交账号密码。
 2. 点击“使用此方案”。已有认证时先按正常操作退出当前会话，再切换方案。
 3. 在已登录状态点击“检测网络”，应直接显示已登录，不应重复提交密码。
 4. 在自己可以中断网络的时间，点击“注销校园网”。应用应确认离线并暂停网络守护。
@@ -191,4 +191,4 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 - 指定参考项目 [LFWQSP2641/scu_net_auto_login](https://github.com/LFWQSP2641/scu_net_auto_login)，固定提交 `194c8b9da995eeef4f6d1f3b83a9f03350293bb0`：[发现与登录实现](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib/Service/LoginService.cs)、[协议常量](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib/Common/LoginConstants.cs)、[RSA 实现](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib/Helper/LegacyCampusRsaEncryptor.cs)、[RSA 固定测试向量](https://github.com/LFWQSP2641/scu_net_auto_login/blob/194c8b9da995eeef4f6d1f3b83a9f03350293bb0/ScuNetAutoLogin/ServiceLib.Test/RsaEncryptorTests.cs)。
 - 同作者 Go 实现固定提交 `8677927e207befa520cbe3ccbfcc4ea4ea56a0af`：[川大空正文注销及响应判断](https://github.com/LFWQSP2641/scunet-auto-login/blob/8677927e207befa520cbe3ccbfcc4ea4ea56a0af/pkg/schools/scu/portal/rvjx/logout.go)。
 
-RSA 兼容实现及测试向量的上游 MIT 许可完整保存在 [scu-net-auto-login-MIT.txt](../assets/licenses/scu-net-auto-login-MIT.txt)，保留 `Copyright (c) 2026 LFWQSP2641`。岚连的集成、配置和文档开发者为 **NingMeng123**。
+RSA 兼容实现及测试向量的上游 MIT 许可完整保存在 [scu-net-auto-login-MIT.txt](../assets/licenses/scu-net-auto-login-MIT.txt)，保留 `Copyright (c) 2026 LFWQSP2641`。上游的集成、配置和文档开发者为 **NingMeng123**；本专版基于其实现构建。

@@ -177,10 +177,22 @@ function createPortalSession(profile, requester, onSecret) {
   return { discover, api, remember };
 }
 
+// 服务器拒绝文案 → 可操作提示（含成都理工大学宜宾校区实测样本与常见锐捷文案）。
+const REJECTION_HINTS = [
+  [/用户名或密码错误|用户名或者密码错误|账号或密码错误|密码错误/, '账号或密码未被服务器接受：请确认使用完整账号（例如学号加运营商后缀，如 @ct），并可在学校自助服务平台核对或找回密码后重试。'],
+  [/同时在线上限|在线设备|设备.{0,8}(?:上限|超限)|超出.{0,8}(?:限制|数量)/, '账号在线设备数可能已达上限：请打开学校自助服务平台下线其它设备后重试。'],
+  [/欠费|余额|停机|欠款|已过期|到期|套餐/, '账号状态可能异常（欠费或套餐到期）：请到学校自助服务平台处理后再试。'],
+  [/不存在|无此用户|未注册|未开通|未绑定/, '账号可能尚未开通或未绑定校园网：请先在自助服务平台完成绑定后再试。'],
+];
+
 function rejected(data, operation) {
   const detail = typeof data.message === 'string' ? data.message.slice(0, 300) : '';
   if (/验证码|captcha/i.test(detail)) throw new CampusError('锐捷认证需要验证码，请打开认证页完成验证后再检测状态。', 'CAPTCHA_REQUIRED');
-  throw new CampusError(`${operation === 'logout' ? '锐捷注销未成功' : '锐捷认证被拒绝，请检查账号、密码和网络服务'}。${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
+  const hint = REJECTION_HINTS.find(([pattern]) => pattern.test(detail))?.[1] || '';
+  if (operation === 'logout') {
+    throw new CampusError(`锐捷注销未成功。${hint ? ` ${hint}` : ''}${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
+  }
+  throw new CampusError(`${hint || '锐捷认证被拒绝，请检查账号、密码和网络服务。'}${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
 }
 
 async function ruijieOperation(profile, operation, context, requester, onSecret = () => {}) {

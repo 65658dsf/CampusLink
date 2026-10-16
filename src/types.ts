@@ -1,6 +1,6 @@
 export type ConnectionState = 'idle' | 'checking' | 'connecting' | 'connected' | 'disconnecting' | 'error';
 export interface ProfileField { key: string; label: string; default?: string; placeholder?: string; options?: { label: string; value: string }[] }
-export interface Profile { id: string; name: string; description: string; version: string; author: string; homepage: string; builtin: boolean; protocol: string; fields?: ProfileField[]; portalDiscovery?: { url: string } }
+export interface Profile { id: string; name: string; description: string; version: string; author: string; homepage: string; builtin: boolean; protocol: string; fields?: ProfileField[]; portalDiscovery?: { url: string }; archived?: boolean }
 export interface Settings { profileId: string; username: string; rememberPassword: boolean; autoLaunch: boolean; autoConnect: boolean; autoReconnect: boolean; reconnectIntervalSeconds: number; minimizeToTray: boolean; parameters: Record<string, string> }
 export interface RequestDiagnostic { method: string; url: string; status?: number; statusText?: string; contentType?: string; durationMs: number; responseBody: string; truncated: boolean }
 export interface LogEntry { id: string; time: string; level: 'info' | 'success' | 'warning' | 'error'; message: string; details?: { code: string; requests: RequestDiagnostic[] } }

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinProfiles, parseProfile, validateProfile, publicProfile, profileParameters, DEFAULT_PORTAL_DISCOVERY_URL } = require('../electron/profiles.cjs');
+const { builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinProfiles, defaultProfile, parseProfile, validateProfile, publicProfile, profileParameters, DEFAULT_PORTAL_DISCOVERY_URL } = require('../electron/profiles.cjs');
 const { CampusService } = require('../electron/service.cjs');
 
 const readExample = name => JSON.parse(fs.readFileSync(path.join(__dirname, `../examples/${name}`), 'utf8'));
@@ -184,6 +184,11 @@ test('all built-in profiles are listed and protected, and selecting Ruijie initi
     assert.equal(snapshot.profiles.find(item => item.id === profile.id).builtin, true);
     assert.throws(() => service.removeProfile(profile.id), /内置/);
   }
+  assert.equal(service.settings.profileId, defaultProfile.id);
+  assert.deepEqual(service.settings.parameters, {});
+  assert.equal(snapshot.profiles.find(item => item.id === builtinProfile.id).archived, true);
+  assert.equal(snapshot.profiles.find(item => item.id === builtinRuijieProfile.id).archived, true);
+  assert.equal(snapshot.profiles.find(item => item.id === builtinCdutYibinProfile.id).archived, undefined);
   assert.equal(builtinCdutYibinProfile.homepage, 'http://10.26.30.253/');
   assert.equal(builtinCdutYibinProfile.ruijie.serviceOptional, true);
   assert.equal(builtinCdutYibinProfile.ruijie.valueEncoding, 'percent');
@@ -210,7 +215,7 @@ test('imported Ruijie profiles persist, restore, enforce IDs and reset correctly
   assert.deepEqual(restored.settings.parameters, { service: '电信出口' });
   assert.equal(restored.snapshot().profiles.some(p => p.id === builtinRuijieProfile.id), true);
   restored.removeProfile(scuExample.id);
-  assert.equal(restored.settings.profileId, builtinProfile.id);
-  assert.deepEqual(restored.settings.parameters, { operator: '1' });
+  assert.equal(restored.settings.profileId, defaultProfile.id);
+  assert.deepEqual(restored.settings.parameters, {});
   assert.equal(create().snapshot().profiles.length, builtinProfiles.length);
 });

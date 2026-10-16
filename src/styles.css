@@ -91,3 +91,7 @@
 .response-footer>[role=status]{margin-right:auto;font-size:10px;line-height:1.7;color:#739280}
 .response-dialog :focus-visible{outline:2px solid #299979;outline-offset:3px}
 @media(max-width:650px){.log-row{flex-wrap:wrap}.log-message{flex:1;min-width:120px}.log-actions{gap:5px}.log-response-button{font-size:9px}.response-dialog{width:calc(100vw - 24px);max-height:calc(100dvh - 24px);border-radius:12px}.response-heading{padding:18px 17px 13px}.response-heading h2{font-size:18px}.response-summary{margin:0 17px;padding:12px}.response-privacy{padding:11px 17px;font-size:9px}.response-requests{padding:0 17px 16px}.response-request{padding:12px}.response-metadata>div{font-size:10px;grid-template-columns:54px minmax(0,1fr);gap:7px}.response-footer{padding:13px 17px;gap:7px;flex-wrap:wrap}.response-footer>[role=status]:not(:empty){flex-basis:100%}.response-body{font-size:10px;max-height:200px}}
+.archived-profiles{margin-top:2px}
+.archived-toggle{display:inline-flex;align-items:center;gap:6px;margin:2px 0 10px}
+.archived-toggle svg{transition:transform .15s ease}
+.archived-toggle svg.expanded{transform:rotate(90deg)}

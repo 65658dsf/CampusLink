@@ -191,6 +191,31 @@ test('errors retain server explanations without credentials, query tokens or cip
   });
 });
 
+test('server rejections map to actionable hints while keeping the original explanation', async t => {
+  const cases = [
+    ['用户名或者密码错误，请重新输入', /完整账号|自助服务平台/],
+    ['账号已达到同时在线上限', /下线其它设备/],
+    ['账号已欠费，请充值', /欠费|套餐/],
+    ['该账号不存在，请联系管理员', /未开通|绑定/],
+  ];
+  for (const [message, hint] of cases) {
+    const { profile } = await fixture(t, { loginResult: 'fail', message });
+    await assert.rejects(runOperation(profile, 'login', context), error => {
+      assert.equal(error.code, 'AUTH_REJECTED');
+      assert.match(error.message, hint);
+      assert.ok(error.message.includes('服务器提示：' + message));
+      for (const secret of [context.username, context.password]) assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+  }
+  const unknown = await fixture(t, { loginResult: 'fail', message: '未知的原因XYZ' });
+  await assert.rejects(runOperation(unknown.profile, 'login', context), error => {
+    assert.match(error.message, /锐捷认证被拒绝，请检查账号、密码和网络服务。/);
+    assert.ok(error.message.includes('服务器提示：未知的原因XYZ'));
+    return true;
+  });
+});
+
 test('literal script and meta-refresh navigation take precedence over a stale page pathname', async t => {
   const first = await fixture(t, { indexHtml: '<script>window.location.href="/eportal/success.jsp";</script>' });
   assert.equal((await runOperation(first.profile, 'status')).online, true);
