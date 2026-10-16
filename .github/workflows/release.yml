@@ -90,6 +90,9 @@ jobs:
       - name: Package Windows without publishing
         if: matrix.platform == 'win'
         run: node scripts/release/build.cjs win x64
+      - name: Verify Windows installer directory normalization
+        if: matrix.platform == 'win'
+        run: node --test scripts/release/installer-path.test.cjs
       - name: Package macOS without publishing
         if: matrix.platform == 'mac'
         env:
