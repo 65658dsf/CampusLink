@@ -28,7 +28,7 @@ test('release names reject arbitrary refs, expressions, prereleases and mismatch
 test('all release targets have distinct architecture-aware filenames and unsigned defaults', () => {
   const names = [['win', 'x64'], ['mac', 'x64'], ['mac', 'arm64']].flatMap(([p, a]) => artifactNames('1.1.0', p, a));
   assert.equal(new Set(names).size, 5);
-  assert.ok(names.includes('Campus-Link-Setup-1.1.0.exe'));
+  assert.ok(names.includes('Campus-Link-Glass-Setup-1.1.0.exe'));
   assert.throws(() => artifactNames('1.1.0', 'win', 'arm64'));
   assert.deepEqual(macSigning({}), { signing: 'unsigned', notarized: false });
   assert.deepEqual(macSigning({ CSC_LINK: 'fixture-certificate' }), { signing: 'developer-id', notarized: false });

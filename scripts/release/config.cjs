@@ -18,7 +18,7 @@ function assertVersions(packageJson, lock, version) {
 
 function artifactNames(version, platform, arch) {
   if (!STABLE_VERSION.test(version)) throw new Error('Unsupported release version.');
-  if (platform === 'win' && arch === 'x64') return [`Campus-Link-Setup-${version}.exe`];
+  if (platform === 'win' && arch === 'x64') return [`Campus-Link-Glass-Setup-${version}.exe`];
   if (platform === 'mac' && ['x64', 'arm64'].includes(arch)) return ['dmg', 'zip'].map(ext => `Campus-Link-${version}-mac-${arch}.${ext}`);
   throw new Error('Supported targets are win/x64, mac/x64 and mac/arm64.');
 }
