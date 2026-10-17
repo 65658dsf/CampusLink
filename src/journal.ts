@@ -9,11 +9,21 @@ export interface JournalEntry {
 
 export const upstreamRepo = 'https://github.com/65658dsf/CampusLink';
 export const upstreamSite = 'https://campuslink.xzncraft.cn';
+export const forkRepo = 'https://github.com/PowerT-0704/CampusLink';
 export const maintainer = { name: 'PowerT-0704', email: '1203019025@qq.com' };
 
 export const projectIntro = '岚连 Campus Link 是面向 Windows / macOS 的校园网认证工具，使用 Electron、React 和 TypeScript 构建，支持连接与注销、启动状态检测、断线自动重连、开机自启动、系统托盘，以及通过 JSON 导入的校园网连接方案。本应用是基于它的成都理工大学（宜宾校区）对接方案版本，已获得原作者完整授权的衍生版本。';
 
 export const journalEntries: JournalEntry[] = [
+  {
+    version: '1.4.1', scope: 'derived', date: '2026-10-17', title: '项目仓库入口与更新体验',
+    items: [
+      '开发日志新增「本项目仓库」入口，可直接打开 GitHub 项目主页（PowerT-0704/CampusLink）。',
+      '首次启动引导优化：已登录校园网时也允许输入并保存当前账号密码，自动连接与断线守护可用。',
+      '默认界面改为液态玻璃（仍可在应用设置一键切换回经典）；顶栏去框线并收窄、四角圆弧一致、导航滑块与切换过场动画。',
+      '软件更新提示支持前往 GitHub Releases 下载或稍后再说，应用设置中可手动检查更新。',
+    ],
+  },
   {
     version: '1.4.0', scope: 'derived', date: '2026-10-16', title: '液态玻璃顶栏贯通与体验更新',
     items: [

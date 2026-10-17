@@ -101,12 +101,12 @@ const http = require('node:http');
     const security = await page.evaluate(() => ({ hasBridge: Boolean(window.campus), nodeAccess: typeof window.require }));
     assert.equal(security.hasBridge, true);
     assert.equal(security.nodeAccess, 'undefined');
-    // 导航滑块（经典）：切换标签后高亮滑块与激活项对齐。
+    // 导航滑块（默认液态）：切换标签后高亮滑块与激活项对齐。
     await page.getByRole('button', { name: '连接方案', exact: false }).first().click();
     await page.waitForTimeout(420);
-    const classicGlider = await page.locator('.nav-glider').boundingBox();
-    const classicActive = await page.locator('.nav-item.active').boundingBox();
-    assert.ok(classicGlider && classicActive && Math.abs(classicGlider.y - classicActive.y) <= 2, '导航滑块与激活项对齐（经典）');
+    const initialGlider = await page.locator('.nav-glider').boundingBox();
+    const initialActive = await page.locator('.nav-item.active').boundingBox();
+    assert.ok(initialGlider && initialActive && Math.abs(initialGlider.y - initialActive.y) <= 2, '导航滑块与激活项对齐（默认液态）');
     await page.getByRole('button', { name: '连接概览', exact: true }).click();
     await expect(page.getByRole('heading', { name: '已登录校园网', exact: true })).toBeVisible();
     const initial = await page.evaluate(async () => { const s = await window.campus.getSnapshot(); return { autoConnect: s.settings.autoConnect, hasPassword: s.hasPassword, status: s.connection.status }; });
@@ -137,7 +137,7 @@ const http = require('node:http');
     await page.getByRole('button', { name: '关闭提示' }).click();
     await page.getByRole('button', { name: '开发日志', exact: true }).click();
     await expect(page.getByRole('heading', { name: '版本记录' })).toBeVisible();
-    await expect(page.locator('.journal-entry').first()).toContainText('v1.4.0');
+    await expect(page.locator('.journal-entry').first()).toContainText('v1.4.1');
     await expect(page.getByText(/NingMeng123/).first()).toBeVisible();
     await expect(page.getByRole('button', { name: '打开上游仓库', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '连接概览', exact: true }).click();
@@ -306,26 +306,11 @@ const http = require('node:http');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 720));
     await page.screenshot({ path: path.join(root, 'artifacts/desktop-compact.png'), fullPage: true });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'No horizontal overflow at minimum window size');
-    // 标题栏吸顶：滚动后仍固定在窗口顶部（可随时拖动窗口）。
-    await page.evaluate(() => window.scrollTo(0, 500));
-    const titlebarBox = await page.locator('.titlebar').boundingBox();
-    assert.ok(titlebarBox && titlebarBox.y >= 0 && titlebarBox.y < 2, 'Titlebar stays pinned while scrolling');
-    await page.screenshot({ path: path.join(root, 'artifacts/titlebar-sticky.png') });
-    await page.evaluate(() => window.scrollTo(0, 0));
     assert.deepEqual(errors, []);
-    // 液态玻璃外观：默认经典，切换后即时生效并截图，再切回经典恢复。
+    // 默认界面为液态玻璃：验证液态形态与独立滚动；再切到经典验证整页滚动吸顶与经典滑块；最后切回液态。
     const glassSupported = process.platform === 'win32' && Number(String(os.release()).split('.')[2] || '0') >= 22000;
     await page.getByRole('button', { name: '应用设置', exact: true }).click();
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.appearance), 'classic');
-    assert.equal(await page.locator('.lg-topbar').count(), 0, '经典模式无贯通顶栏');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.titlebar')).backgroundColor), 'rgb(251, 252, 252)', '经典模式标题栏保持原样');
-    assert.equal((await page.evaluate(() => window.campus.getSnapshot())).app.windowGlass, false);
-    await page.evaluate(() => { window.__fxSeen = false; const shell = document.querySelector('.app-shell'); new MutationObserver(() => { if (/appearance-enter-/.test(shell.className)) window.__fxSeen = true; }).observe(shell, { attributes: true, attributeFilter: ['class'] }); });
-    await page.getByRole('switch', { name: '界面外观：液态玻璃', exact: true }).click();
-    await expect.poll(() => page.evaluate(() => Boolean(window.__fxSeen))).toBe(true);
-    // 等待过场动画结束再测量几何，避免动画中的 transform 影响位置断言。
-    await expect.poll(() => page.evaluate(() => /appearance-enter-/.test(document.querySelector('.app-shell').className)), { timeout: 2500 }).toBe(false);
-    await expect(page.locator('html')).toHaveAttribute('data-appearance', 'liquid');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.appearance), 'liquid', '默认界面为液态玻璃');
     await expect(page.locator('.lg-panel')).toBeVisible();
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.lg-panel')).backgroundColor), 'rgba(0, 0, 0, 0)', '玻璃面板纯透光、无自带底色');
     await expect(page.locator('.lg-topbar')).toBeVisible();
@@ -341,7 +326,6 @@ const http = require('node:http');
     const liquidGlider = await page.locator('.nav-glider').boundingBox();
     const liquidActive = await page.locator('.nav-item.active').boundingBox();
     assert.ok(liquidGlider && liquidActive && Math.abs(liquidGlider.y - liquidActive.y) <= 2, '导航滑块与激活项对齐（液态）');
-    await expect.poll(async () => (await page.evaluate(() => window.campus.getSnapshot())).settings.appearance).toBe('liquid');
     assert.equal((await page.evaluate(() => window.campus.getSnapshot())).app.windowGlass, glassSupported);
     if (glassSupported) console.log('background color (liquid):', await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBackgroundColor()));
     await page.screenshot({ path: path.join(root, 'artifacts/liquid-settings.png') });
@@ -356,12 +340,33 @@ const http = require('node:http');
     await page.screenshot({ path: path.join(root, 'artifacts/desktop-liquid-scrolled.png') });
     await page.evaluate(() => { document.querySelector('main').scrollTo(0, 0); });
     await page.screenshot({ path: path.join(root, 'artifacts/desktop-liquid.png'), fullPage: true });
+    // 切到经典：验证白色标题栏、无顶栏、整页滚动吸顶与经典导航滑块。
     await page.getByRole('button', { name: '应用设置', exact: true }).click();
+    await page.evaluate(() => { window.__fxSeen = false; const shell = document.querySelector('.app-shell'); new MutationObserver(() => { if (/appearance-enter-/.test(shell.className)) window.__fxSeen = true; }).observe(shell, { attributes: true, attributeFilter: ['class'] }); });
     await page.getByRole('switch', { name: '界面外观：液态玻璃', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => Boolean(window.__fxSeen))).toBe(true);
+    await expect.poll(() => page.evaluate(() => /appearance-enter-/.test(document.querySelector('.app-shell').className)), { timeout: 2500 }).toBe(false);
     await expect(page.locator('html')).toHaveAttribute('data-appearance', 'classic');
     await expect(page.locator('.lg-panel')).toHaveCount(0);
+    assert.equal(await page.locator('.lg-topbar').count(), 0, '经典模式无贯通顶栏');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.titlebar')).backgroundColor), 'rgb(251, 252, 252)', '经典模式标题栏保持原样');
     assert.equal((await page.evaluate(() => window.campus.getSnapshot())).app.windowGlass, false);
     if (glassSupported) console.log('background color (classic):', await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBackgroundColor()));
+    await page.getByRole('button', { name: '连接概览', exact: true }).click();
+    await page.evaluate(() => window.scrollTo(0, 500));
+    const titlebarBox = await page.locator('.titlebar').boundingBox();
+    assert.ok(titlebarBox && titlebarBox.y >= 0 && titlebarBox.y < 2, 'Titlebar stays pinned while scrolling（经典）');
+    await page.screenshot({ path: path.join(root, 'artifacts/titlebar-sticky.png') });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(420);
+    const classicGlider = await page.locator('.nav-glider').boundingBox();
+    const classicActive = await page.locator('.nav-item.active').boundingBox();
+    assert.ok(classicGlider && classicActive && Math.abs(classicGlider.y - classicActive.y) <= 2, '导航滑块与激活项对齐（经典）');
+    // 切回液态，保持默认终态。
+    await page.getByRole('button', { name: '应用设置', exact: true }).click();
+    await page.getByRole('switch', { name: '界面外观：液态玻璃', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-appearance', 'liquid');
+    await expect(page.locator('.lg-panel')).toBeVisible();
     // Closing with the tray preference disabled must actually quit, without changing network state.
     await page.getByRole('button', { name: '应用设置', exact: true }).click();
     // Stub only the network boundary; exercise the checker state, IPC events,

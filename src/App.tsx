@@ -3,7 +3,7 @@ import { ArrowDownToLine, ArrowRight, Check, CheckCheck, ChevronDown, ChevronRig
 import type { LucideIcon } from 'lucide-react';
 import { api, isPreview } from './api';
 import type { LogEntry, Profile, Settings, Snapshot, UpdateState } from './types';
-import { journalEntries, maintainer, projectIntro, upstreamRepo, upstreamSite } from './journal';
+import { journalEntries, maintainer, projectIntro, upstreamRepo, upstreamSite, forkRepo } from './journal';
 import { Glass } from '@samasante/liquid-glass';
 import type { GlassOptics } from '@samasante/liquid-glass';
 
@@ -433,6 +433,7 @@ export default function App() {
           <section className="card settings-card">
             <div className="card-heading"><div className="section-title"><span className="icon-tile"><FileText size={20} /></span><div><h2>关于上游项目</h2><p>本应用的原点</p></div></div><span className="badge subtle">经授权衍生</span></div>
             <div className="settings-row"><div><strong>岚连 Campus Link</strong><p>{projectIntro}</p><p className="about-detail">上游仓库：{upstreamRepo} · 官网：{upstreamSite}</p></div><div className="journal-actions"><button className="button secondary small" onClick={() => void action(() => api.openUrl(upstreamRepo), '已在浏览器中打开上游仓库。')}><ExternalLink size={14} />打开上游仓库</button></div></div>
+            <div className="settings-row"><div><strong>本分支项目 · 岚连 CDUTYB 专版</strong><p>本项目仓库：{forkRepo}</p><p className="about-detail">液态玻璃版与 CDUTYB 专版的源码、Issue 与 Release 均在此仓库发布。</p></div><div className="journal-actions"><button className="button secondary small" onClick={() => void action(() => api.openUrl(forkRepo), '已在浏览器中打开本项目仓库。')}><ExternalLink size={14} />打开本项目仓库</button></div></div>
           </section>
           <section className="card settings-card">
             <div className="card-heading"><div className="section-title"><span className="icon-tile"><ShieldCheck size={20} /></span><div><h2>授权与署名</h2><p>授权说明与维护者</p></div></div></div>

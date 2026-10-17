@@ -1,6 +1,6 @@
 {
   "name": "campus-link-liquid",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "type": "module",
   "description": "岚连 · CDUTYB 专版（液态玻璃版）—— 面向成都理工大学（宜宾校区）的校园网连接工具（基于 Campus Link）",

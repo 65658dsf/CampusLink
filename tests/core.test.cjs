@@ -263,7 +263,12 @@ test('password manager stores plaintext credentials, enables automatic connectio
   assert.throws(() => service.setCredentials({ username: '', password: 'x' }), /账号/);
   assert.throws(() => service.setCredentials({ username: 'ok', password: '' }), /密码/);
   await service.connect({ username: 'manager-account', password: 'manager-secret' });
-  assert.throws(() => service.setCredentials({ username: 'other-account', password: 'x' }), /断开/);
+  const savedWhileOnline = service.setCredentials({ username: 'other-account', password: 'other-secret' });
+  assert.equal(savedWhileOnline.settings.username, 'other-account', '已登录时也允许保存新账号');
+  assert.equal(savedWhileOnline.settings.autoConnect, false);
+  assert.equal(savedWhileOnline.hasPassword, true);
+  assert.equal(service.session.username, 'manager-account', '保存账号密码不会改变当前会话');
+  assert.equal(service.decryptPassword(), 'other-secret');
   await service.disconnect();
 });
 test('unreadable encrypted credentials disable automatic login and can be securely replaced', async t => {

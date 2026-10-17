@@ -8,7 +8,7 @@ const { builtinProfiles, defaultProfile, publicProfile, validateProfile, parsePr
 const { runOperation } = require('./adapters.cjs');
 const { CampusError } = require('./transport.cjs');
 
-const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, appearance: 'classic', parameters: profileParameters(defaultProfile) });
+const defaults = () => ({ profileId: defaultProfile.id, username: '', rememberPassword: false, autoLaunch: false, autoConnect: false, autoReconnect: true, reconnectIntervalSeconds: 10, minimizeToTray: true, appearance: 'liquid', parameters: profileParameters(defaultProfile) });
 const IDLE = (selected = false) => ({ status: 'idle', message: selected ? '准备就绪，连接校园网络后即可认证。' : '请先前往「连接方案」选择适合学校的连接方案。' });
 
 class CampusService extends EventEmitter {
@@ -220,13 +220,12 @@ class CampusService extends EventEmitter {
     return this.publish();
   }
   setCredentials(input) {
-    // 明文账号密码管理：不受连接忙碌限制；连接中仅允许改密码，改账号需先断开。
+    // 明文账号密码管理：不受连接忙碌限制；已登录时也允许保存账号密码，当前会话保持不变。
     keys(input, ['username', 'password'], '账号密码');
     const username = typeof input.username === 'string' ? input.username.trim() : '';
     if (!username || username.length > 200 || /[\r\n\u0000]/.test(username)) throw new Error('账号格式无效。');
     if (typeof input.password !== 'string' || !input.password || input.password.length > 1024 || /[\r\n\u0000]/.test(input.password)) throw new Error('密码格式无效。');
     const changedIdentity = username !== this.settings.username;
-    if (changedIdentity && (this.session || this.connection.status === 'connected')) throw new Error('请先断开当前认证，再更改账号。');
     this.credential = { profileId: this.settings.profileId, username, password: input.password };
     this.settings = { ...this.settings, username, rememberPassword: true, ...(changedIdentity ? { autoConnect: false } : {}) };
     if (changedIdentity) { this.stopMonitoring(); this.reconnectContext = null; this.reconnectWarning = false; }
@@ -235,6 +234,8 @@ class CampusService extends EventEmitter {
     for (const context of [this.session, this.reconnectContext]) {
       if (context?.profileId === this.settings.profileId && context.username === username) context.password = input.password;
     }
+    // 已登录时身份变化：保留当前会话，并按守护设置重新布防（手动暂停状态不受影响）。
+    if (changedIdentity && this.connection.status === 'connected') this.armMonitoring();
     return this.publish();
   }
   decryptPassword() {
