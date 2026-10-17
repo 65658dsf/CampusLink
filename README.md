@@ -2,7 +2,7 @@
 
 <img src="assets/icon.png" width="88" alt="岚连 Campus Link 图标" />
 
-# 岚连 Campus Link - CDUTYB专版
+# 岚连 Campus Link · CDUTYB 专版
 
 **简单连接，自在校园。**
 
@@ -15,7 +15,9 @@
 
 [**📥 下载客户端**](https://github.com/65658dsf/CampusLink/releases/latest) · [**📖 在线文档**](https://campuslink.xzncraft.cn/) · [**💬 反馈问题**](https://github.com/65658dsf/CampusLink/issues)
 
-开发者：**[NingMeng123](https://github.com/65658dsf)**
+开发者：**[PowerT-0704](https://github.com/PowerT-0704)**
+
+基于 **[NingMeng123](https://github.com/65658dsf)** 的 Campus Link 构建；本版本在 v1.4.0 的基础上增加「液态玻璃」外观。
 
 </div>
 
@@ -29,15 +31,26 @@
 | 🔐 本地凭据 | 记住的密码通过系统加密保存，也支持仅在本次连接中使用 |
 | 🖥️ 桌面常驻 | Windows / macOS 托盘、可选开机自启动、启动后自动连接与更新检查 |
 | 🔎 方便排障 | 活动日志、服务器响应详情和脱敏诊断包导出 |
+| 🪟 双外观 | 经典 / 液态玻璃一键切换：玻璃侧边栏与顶栏，Win11 22H2 以上可透视桌面 |
 
 <p align="center">
-  <img src="docs/images/connection-profiles.png" width="960" alt="岚连连接方案页面：首次启动引导、学校搜索和内置方案" />
+  <img src="docs/images/connection-profiles-liquid-glass.png" width="960" alt="岚连 · CDUTYB 专版（液态玻璃外观）：连接方案页面" />
 </p>
+
+<p align="center"><sub>液态玻璃外观：侧边栏与顶栏是可折射的玻璃面板；在「应用设置 → 界面外观」随时切回经典。</sub></p>
+
+## 🪟 两种外观，一键切换
+
+- **经典（默认）**：与上游一致的浅色界面，老用户升级后外观不变。
+- **液态玻璃**：侧边栏与顶栏变为玻璃面板，内容在玻璃下方独立滚动；Windows 11 22H2 及以上使用系统 Acrylic 材质透视桌面，其他平台自动回退为应用内玻璃。
+- 切换入口：**应用设置 → 界面外观**。只影响外观，不改变认证、凭据存储与日志行为。
+
+<p align="center"><img src="docs/images/connection-profiles.png" width="640" alt="经典外观（默认）下的连接方案页面" /><br /><sub>经典外观（默认）</sub></p>
 
 ## 🚀 三步开始
 
 1. **安装客户端**：从 [Releases](https://github.com/65658dsf/CampusLink/releases/latest) 下载 Windows x64、Intel Mac 或 Apple Silicon 对应安装包。
-2. **选择学校方案**：先连接校园 Wi-Fi 或网线，再到“连接方案”搜索学校。首次打开不会预选方案。
+2. **确认学校方案**：先连接校园 Wi-Fi 或网线，再到“连接方案”确认学校；默认已选中成都理工大学（宜宾校区），其他学校可在列表中切换或导入。
 3. **填写账号并连接**：已认证时会直接展示在线状态；需要认证时输入账号密码，按需开启记住密码和自动连接。
 
 默认内置**成都理工大学（宜宾校区）**方案；其他学校可[制作并导入 JSON](docs/plugin-guide.md)。具体部署仍需校内验证，锐捷支持范围为 ePortal 网页认证。
