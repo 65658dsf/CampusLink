@@ -1,4 +1,4 @@
-# 岚连 Campus Link v1.1.1
+# 上游发布说明存档：Campus Link v1.1.1
 
 开发者：**NingMeng123** · [项目主页](https://campuslink.xzncraft.cn/) · [开源仓库](https://github.com/65658dsf/CampusLink)
 

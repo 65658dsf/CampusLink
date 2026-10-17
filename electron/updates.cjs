@@ -3,8 +3,8 @@
 // Campus Link · NingMeng123
 const { EventEmitter } = require('node:events');
 
-const RELEASES_URL = 'https://github.com/65658dsf/CampusLink/releases';
-const API_URL = 'https://api.github.com/repos/65658dsf/CampusLink/releases/latest';
+const RELEASES_URL = 'https://github.com/PowerT-0704/CampusLink/releases';
+const API_URL = 'https://api.github.com/repos/PowerT-0704/CampusLink/releases/latest';
 const VERSION_PATTERN = /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const RESPONSE_LIMIT = 256 * 1024;
 const NOTES_LIMIT = 32 * 1024;

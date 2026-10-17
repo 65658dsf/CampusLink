@@ -4,6 +4,9 @@ const MAX_PROFILE_BYTES = 64 * 1024;
 const RESERVED = new Set(['__proto__', 'prototype', 'constructor']);
 const BASE_VARIABLES = ['username', 'password', 'ip', 'mac', 'acIp', 'acName'];
 const DEFAULT_PORTAL_DISCOVERY_URL = 'http://www.msftconnecttest.com/redirect';
+// 折叠区展示的内置方案：仍保留在 builtinProfiles 中（可选择、受保护），
+// 界面默认收起；从集合中移除对应 ID 即可恢复常显。
+const ARCHIVED_BUILTIN_IDS = new Set(['builtin-gzqy', 'builtin-scu-ruijie']);
 const PROFILE_KEYS = ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'portalDiscovery'];
 
 function fail(message) { throw new Error(message); }
@@ -173,7 +176,7 @@ function parseProfile(text) {
 }
 function publicProfile(profile, builtin = false) {
   const { id, name, description = '', version, author = '', homepage, protocol, fields = [], portalDiscovery } = profile;
-  return { id, name, description, version, author, homepage, protocol, fields, builtin, ...(portalDiscovery ? { portalDiscovery } : {}) };
+  return { id, name, description, version, author, homepage, protocol, fields, builtin, ...(portalDiscovery ? { portalDiscovery } : {}), ...(ARCHIVED_BUILTIN_IDS.has(id) ? { archived: true } : {}) };
 }
 function exportProfile(profile) {
   // Export the stored definition, never a connection snapshot or a resolved
@@ -254,7 +257,7 @@ const builtinCdutYibinProfile = validateProfile({
   id: 'builtin-cdut-yibin-ruijie',
   name: '成都理工大学（宜宾校区）· 锐捷 ePortal',
   description: '成都理工大学宜宾校区锐捷 ePortal 认证（2026-10-16 依据真实抓包核验）；请先连接 CDUTYB-WEB 无线或校园有线网络。登录不选择网络服务，使用学校统一认证账号。',
-  version: '1.0.0', author: 'NingMeng123', homepage: 'http://10.26.30.253/',
+  version: '1.0.0', author: '岚连 · CDUTYB 专版', homepage: 'http://10.26.30.253/',
   protocol: 'ruijie', timeoutMs: 10000,
   portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
   ruijie: {
@@ -270,4 +273,6 @@ const builtinCdutYibinProfile = validateProfile({
 }, { builtin: true });
 
 const builtinProfiles = [builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile];
-module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, exportProfile, exportProfileJson, profileParameters, safeUrl, keys };
+// 本专版的默认首选方案（全新安装与外部方案移除后的回退目标）。
+const defaultProfile = builtinCdutYibinProfile;
+module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, ARCHIVED_BUILTIN_IDS, builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinProfiles, defaultProfile, validateProfile, parseProfile, publicProfile, exportProfile, exportProfileJson, profileParameters, safeUrl, keys };

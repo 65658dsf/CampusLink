@@ -184,10 +184,13 @@ test('all built-in profiles are listed and protected, and selecting Ruijie initi
     assert.equal(snapshot.profiles.find(item => item.id === profile.id).builtin, true);
     assert.throws(() => service.removeProfile(profile.id), /内置/);
   }
-  assert.equal(service.settings.profileId, '');
+  assert.equal(service.settings.profileId, 'builtin-cdut-yibin-ruijie');
   assert.deepEqual(service.settings.parameters, {});
-  assert.equal(snapshot.profiles.every(profile => !Object.hasOwn(profile, 'archived')), true);
-  assert.equal(snapshot.profiles.every(profile => profile.author === 'NingMeng123'), true);
+  assert.equal(snapshot.profiles.find(profile => profile.id === 'builtin-gzqy').archived, true);
+  assert.equal(snapshot.profiles.find(profile => profile.id === 'builtin-scu-ruijie').archived, true);
+  assert.equal(snapshot.profiles.find(profile => profile.id === 'builtin-cdut-yibin-ruijie').archived, undefined);
+  assert.equal(snapshot.profiles.filter(profile => profile.id !== 'builtin-cdut-yibin-ruijie').every(profile => profile.author === 'NingMeng123'), true);
+  assert.equal(snapshot.profiles.find(profile => profile.id === 'builtin-cdut-yibin-ruijie').author, '岚连 · CDUTYB 专版');
   assert.equal(builtinCdutYibinProfile.homepage, 'http://10.26.30.253/');
   assert.equal(builtinCdutYibinProfile.ruijie.serviceOptional, true);
   assert.equal(builtinCdutYibinProfile.ruijie.valueEncoding, 'percent');
@@ -214,10 +217,10 @@ test('imported Ruijie profiles persist, restore, enforce IDs and reset correctly
   assert.deepEqual(restored.settings.parameters, { service: '电信出口' });
   assert.equal(restored.snapshot().profiles.some(p => p.id === builtinRuijieProfile.id), true);
   restored.removeProfile(scuExample.id);
-  assert.equal(restored.settings.profileId, '');
+  assert.equal(restored.settings.profileId, 'builtin-cdut-yibin-ruijie');
   assert.deepEqual(restored.settings.parameters, {});
   const removed = create();
   assert.equal(removed.snapshot().profiles.length, builtinProfiles.length);
-  assert.equal(removed.settings.profileId, '');
+  assert.equal(removed.settings.profileId, 'builtin-cdut-yibin-ruijie');
   assert.deepEqual(removed.settings.parameters, {});
 });

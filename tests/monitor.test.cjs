@@ -234,7 +234,7 @@ test('saving an updated password replaces session and offline reconnect credenti
     assert.deepEqual(loginPasswords, ['old-password', 'updated-password']);
     assert.equal(service.connection.status, 'connected');
     const disk = fs.readFileSync(service.file, 'utf8');
-    assert.equal(disk.includes('updated-password'), false);
+    assert.equal(disk.includes('updated-password'), true);
     assert.equal(disk.includes('old-password'), false);
   }
 });
