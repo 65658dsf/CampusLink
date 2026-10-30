@@ -130,6 +130,7 @@ test('discovery never follows ePortal credential URLs or read-write GET actions'
   for (const path of [
     '/?user_account=private', '/?user_password=private',
     '/eportal/?c=Portal&a=login', '/eportal/?c=Portal&a=logout',
+    '/eportal/portal/login', '/eportal/portal/logout', '/eportal/%70ortal/logout',
     '/drcom/login', '/drcom/logout', '/F.htm',
   ]) {
     const f = fixture({ [PROBE]: { status: 302, location: `http://10.8.6.41${path}` } });

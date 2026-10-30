@@ -29,7 +29,7 @@
 
 可保留 `portalDiscovery` 自动发现当前网络认证入口；`homepage` 是发现失败时的已知回退地址。若声明 `fields` 中的 `operator` 字段，必须提供非空单行字符串默认值或选项，它会作为 `R3` 参数发送；不声明时适配器使用 `1`。不要自行猜测运营商编号、账号后缀或服务值。只适用于协议与现有适配器一致的 Dr.COM Web 部署，其他请求参数、签名或认证流程需要修改并测试主程序适配器。
 
-`drcom-eportal` 是另一条 Dr.COM 登录流程：GET `/eportal/`，使用 `c=Portal`、`a=login` 和 `user_account=,0,原始学号`，密码按原值进行 URL 编码。它沿用 Dr.COM 只读状态查询和注销，并在操作后复核状态；不使用 `/drcom/login`，也不使用锐捷 RSA 配置。当前景陶方案不声明 `fields`，不添加账号后缀、不猜测运营商编号。可以直接从景陶卡片导出，或修改 [景陶示例](../examples/jdztc-campus.example.json)；不要把相似的产品名称当作协议兼容证据，其他学校仍需核验。
+`drcom-eportal` 支持旧流程和新版 `portal-v4` 流程。没有 `drcomEportal` 配置的旧 JSON 保留 GET `/eportal/?c=Portal&a=login`、原始账号及兼容接口行为，不自动修改用户导入的定义。景陶内置方案和 [景陶示例](../examples/jdztc-campus.example.json) 使用 `drcomEportal: { "variant": "portal-v4", "apiPort": 801 }`：认证页保留 HTTP 80 端口，登录改为同主机 801 端口的 `/eportal/portal/login`，账号字段为 `,0,完整账号`，密码按原值 URL 编码。`operator` 的 `telecom`、`cmcc`、`unicom`、`xyw` 分别对应网页确认的 `@telecom`、`@cmcc`、`@unicom`、`@xyw`；`xyw` 的网页原名是“测试”，不另称校园网。默认电信，正确后缀不重复追加；`raw`（其他）按输入的完整账号提交。新版状态保留 80 端口只读查询及严格页面回退，兼容注销使用 801 端口 `/eportal/portal/logout`，操作后均独立复核。它不使用 `/drcom/login` 或锐捷 RSA 配置，详细证据和验证范围见 [景陶接入说明](jdztc-guide.md)。
 
 ## 完整示例
 
@@ -108,6 +108,7 @@
 | `fields` | HTTP / Dr.COM 可选 | 界面上的额外输入项，最多 12 项；Dr.COM 若声明 `operator` 须有非空默认值或选项；锐捷必须声明有非空默认值或选项的 `service` 字段 |
 | `operations` | HTTP 必填 | `http` 必须完整提供 `login`、`logout`、`status`；`drcom` / `drcom-eportal` / `ruijie` 禁止设置此字段 |
 | `ruijie` | 锐捷必填 | 仅 `ruijie` 使用的发现与加密配置，详见 [锐捷教程](ruijie-guide.md) |
+| `drcomEportal` | 否 | 仅 `drcom-eportal` 使用；`{ "variant": "portal-v4", "apiPort": 801 }` 开启新版端口与接口流程；省略时保留旧流程 |
 | `portalDiscovery` | 否 | 仅 `drcom` / `drcom-eportal` / `ruijie` 支持；形如 `{ "url": "http://www.msftconnecttest.com/redirect" }`，开启只读网络入口发现 |
 
 不接受未声明的额外属性。配置中的 URL 必须为固定字符串，不能包含用户名密码、片段 `#...` 或模板变量。HTTP 方案所有操作的 URL 必须与 `homepage` **同源**，即协议、主机、端口完全相同；不同路径可以使用。认证页在端口 80、接口在端口 801 的通用 HTTP 方案不能以这两个地址直接组合通过校验。

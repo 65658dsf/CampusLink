@@ -226,3 +226,189 @@ test('request observers receive full account and device secrets for diagnostic r
   assert.ok(registered.includes(`,0,${account.username}`));
   assert.equal(state.calls.length, 0);
 });
+
+async function portalV4Fixture(t, initial = {}) {
+  const state = { online: false, ip: '192.0.2.54', calls: [], apiCalls: [], ...initial };
+  const listen = async handler => {
+    const server = http.createServer(handler);
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+    return `http://127.0.0.1:${server.address().port}`;
+  };
+  const apiOrigin = await listen((req, res) => {
+    const url = new URL(req.url, 'http://local.invalid');
+    state.apiCalls.push({ url, headers: req.headers, method: req.method });
+    if (state.apiRedirect) { res.writeHead(302, { Location: state.apiRedirect }); res.end(); return; }
+    if (url.pathname === '/eportal/portal/logout') { state.online = false; res.end('dr1003({"result":1})'); return; }
+    if (url.pathname !== '/eportal/portal/login') { res.writeHead(404); res.end('unknown API'); return; }
+    if (state.loginReply !== undefined) { res.end(`dr1003(${JSON.stringify(state.loginReply)})`); return; }
+    if (state.rejectLogin) {
+      res.end(`dr1003(${JSON.stringify({ result: 0, msga: `${url.searchParams.get('user_account')} ${url.searchParams.get('user_password')}` })})`);
+      return;
+    }
+    state.online = true;
+    res.end('dr1003({"result":1})');
+  });
+  const origin = await listen((req, res) => {
+    const url = new URL(req.url, 'http://local.invalid');
+    state.calls.push({ url, headers: req.headers, method: req.method });
+    if (url.pathname === '/a79.htm') {
+      if (!url.searchParams.has('userip')) {
+        res.writeHead(302, { Location: `/a79.htm?userip=${state.ip}&wlanacip=192.0.2.1&wlanacname=Landing%20AC` }); res.end();
+      } else res.end(state.page ?? (state.online ? onlinePage : loginPage));
+    } else if (url.pathname === '/drcom/chkstatus') res.end(`dr1003(${JSON.stringify(state.statusReply ?? { result: state.online ? 1 : 0, v46ip: state.ip, ...(state.online ? { uid: 'synthetic-session-student' } : {}) })})`);
+    else if (url.pathname === '/drcom/logout') { state.online = false; res.end('dr1003({"result":1})'); }
+    else { res.writeHead(404); res.end('no login API on landing port'); }
+  });
+  return {
+    state, origin, apiOrigin,
+    profile: {
+      id: 'fixture-jcu-v4', protocol: 'drcom-eportal', homepage: `${origin}/a79.htm`, timeoutMs: 1000,
+      drcomEportal: { variant: 'portal-v4', apiPort: Number(new URL(apiOrigin).port) },
+      fields: [{ key: 'operator', label: '运营商', default: 'telecom', options: [
+        { label: '中国电信', value: 'telecom' }, { label: '中国移动', value: 'cmcc' },
+        { label: '中国联通', value: 'unicom' }, { label: '测试', value: 'xyw' }, { label: '完整账号', value: 'raw' },
+      ] }],
+    },
+  };
+}
+
+test('portal-v4 matches the captured login port, query order, duplicate language and root referrer', async t => {
+  const { state, profile, origin, apiOrigin } = await portalV4Fixture(t);
+  assert.equal((await drcomEportalOperation(profile, 'login', account)).online, true);
+  assert.equal(state.apiCalls.length, 1);
+  const login = state.apiCalls[0];
+  assert.equal(login.url.pathname, '/eportal/portal/login');
+  assert.equal(login.headers.host, new URL(apiOrigin).host);
+  assert.equal(login.headers.referer, `${origin}/`);
+  assert.equal(login.method, 'GET');
+  assert.deepEqual([...login.url.searchParams].map(([key, value]) => [key, key === 'v' ? '<random>' : value]), [
+    ['callback', 'dr1003'], ['login_method', '1'], ['user_account', `,0,${account.username}@telecom`],
+    ['user_password', account.password], ['wlan_user_ip', state.ip], ['wlan_user_ipv6', ''],
+    ['wlan_user_mac', '000000000000'], ['wlan_ac_ip', ''], ['wlan_ac_name', ''],
+    ['jsVersion', '4.2.1'], ['terminal_type', '1'], ['lang', 'zh-cn'], ['v', '<random>'], ['lang', 'zh'],
+  ]);
+  assert.match(login.url.searchParams.get('v'), /^\d{4}$/);
+  assert.match(login.url.search, /user_password=a%26b%2B%20c%2F%25/);
+  assert.equal(state.calls.at(-1).url.pathname, '/drcom/chkstatus');
+  assert.equal(state.calls.at(-1).url.searchParams.get('jsVersion'), '4.2.1');
+  assert.equal(state.calls.some(call => call.url.pathname.includes('/eportal/')), false, 'No login is submitted to the page port');
+  assert.ok([...state.calls, ...state.apiCalls].every(call => !call.headers.cookie && !call.headers.authorization));
+});
+
+test('portal-v4 appends the verified suffix once and leaves explicit raw accounts unchanged', async t => {
+  const { profile, state } = await portalV4Fixture(t);
+  await drcomEportalOperation(profile, 'login', { ...account, username: 'synthetic-student@telecom' });
+  assert.equal(state.apiCalls.at(-1).url.searchParams.get('user_account'), ',0,synthetic-student@telecom');
+  state.online = false;
+  await drcomEportalOperation(profile, 'login', { ...account, username: 'synthetic-student@custom', parameters: { operator: 'raw' } });
+  assert.equal(state.apiCalls.at(-1).url.searchParams.get('user_account'), ',0,synthetic-student@custom');
+  state.online = false;
+  const withoutField = { ...profile }; delete withoutField.fields;
+  await drcomEportalOperation(withoutField, 'login', { ...account, username: 'synthetic-original' });
+  assert.equal(state.apiCalls.at(-1).url.searchParams.get('user_account'), ',0,synthetic-original');
+});
+
+test('portal-v4 uses each confirmed selector suffix and never appends it twice', async t => {
+  const { profile, state } = await portalV4Fixture(t);
+  for (const [operator, suffix] of [['telecom', '@telecom'], ['cmcc', '@cmcc'], ['unicom', '@unicom'], ['xyw', '@xyw']]) {
+    state.online = false;
+    await drcomEportalOperation(profile, 'login', { ...account, username: 'synthetic-student', parameters: { operator } });
+    assert.equal(state.apiCalls.at(-1).url.searchParams.get('user_account'), `,0,synthetic-student${suffix}`);
+    state.online = false;
+    await drcomEportalOperation(profile, 'login', { ...account, username: `synthetic-student${suffix}`, parameters: { operator } });
+    assert.equal(state.apiCalls.at(-1).url.searchParams.get('user_account'), `,0,synthetic-student${suffix}`);
+  }
+});
+
+test('portal-v4 rejects mismatched suffixes and unknown operators before any request', async t => {
+  const { profile, state } = await portalV4Fixture(t);
+  for (const input of [
+    { ...account, username: 'synthetic-student@other' },
+    { ...account, username: 'synthetic-student@telecom', parameters: { operator: 'cmcc' } },
+    { ...account, username: 'synthetic-student@xyw', parameters: { operator: 'unicom' } },
+    { ...account, parameters: { operator: 'unverified' } },
+    { ...account, parameters: { operator: 1 } },
+    { ...account, parameters: { operator: ['telecom'] } },
+  ]) await assert.rejects(drcomEportalOperation(profile, 'login', input), { code: 'INVALID_PARAMETERS' });
+  assert.equal(state.calls.length, 0);
+  assert.equal(state.apiCalls.length, 0);
+});
+
+test('portal-v4 reacquires the client IP and never changes the saved profile', async t => {
+  const { profile, state } = await portalV4Fixture(t);
+  const before = JSON.stringify(profile);
+  await drcomEportalOperation(profile, 'login', account);
+  state.online = false; state.ip = '192.0.2.88';
+  await drcomEportalOperation(profile, 'login', account);
+  assert.deepEqual(state.apiCalls.map(call => call.url.searchParams.get('wlan_user_ip')), ['192.0.2.54', '192.0.2.88']);
+  assert.equal(JSON.stringify(profile), before);
+});
+
+test('portal-v4 API redirects never forward credentials to another destination', async t => {
+  const { profile, state } = await portalV4Fixture(t, { apiRedirect: 'http://must-not-contact.example.invalid/capture' });
+  await assert.rejects(drcomEportalOperation(profile, 'login', account), { code: 'NETWORK_ERROR' });
+  assert.equal(state.apiCalls.length, 1);
+  assert.equal(state.calls.some(call => call.url.pathname === '/drcom/chkstatus'), false);
+});
+
+test('portal-v4 suffix accounts and password echoes are hidden in operation diagnostics', async t => {
+  const { profile } = await portalV4Fixture(t, { rejectLogin: true });
+  const { runOperation } = require('../electron/adapters.cjs');
+  await assert.rejects(runOperation(profile, 'login', account), error => {
+    assert.equal(error.code, 'AUTH_REJECTED');
+    const rendered = JSON.stringify({ message: error.message, diagnostics: error.diagnostics });
+    for (const secret of [account.username, `${account.username}@telecom`, `,0,${account.username}@telecom`, account.password]) assert.equal(rendered.includes(secret), false);
+    return true;
+  });
+});
+
+test('portal-v4 preserves the captured cloud-password rejection and does not verify or claim success', async t => {
+  const message = '云陶密码错误，请登录云上陶大修改密码';
+  const { profile, state } = await portalV4Fixture(t, { loginReply: { result: 0, msg: message, ret_code: 1 } });
+  const { runOperation } = require('../electron/adapters.cjs');
+  await assert.rejects(runOperation(profile, 'login', account), error => {
+    assert.equal(error.code, 'AUTH_REJECTED');
+    assert.equal(error.message.includes(message), true);
+    assert.equal(error.diagnostics.at(-1).responseBody.includes(message), true);
+    return true;
+  });
+  assert.equal(state.apiCalls.length, 1);
+  assert.equal(state.calls.some(call => call.url.pathname === '/drcom/chkstatus'), false);
+  assert.equal(state.online, false);
+});
+
+test('portal-v4 logout uses a bare API-port request without account credentials and verifies offline', async t => {
+  const { state, profile, origin, apiOrigin } = await portalV4Fixture(t, { online: true });
+  assert.equal((await drcomEportalOperation(profile, 'logout', account)).online, false);
+  assert.equal(state.apiCalls.length, 1);
+  const logout = state.apiCalls[0];
+  assert.equal(logout.url.pathname, '/eportal/portal/logout');
+  assert.equal(logout.url.search, '');
+  assert.equal(logout.headers.host, new URL(apiOrigin).host);
+  assert.equal(logout.headers.referer, `${origin}/`);
+  assert.equal(state.calls[0].url.pathname, '/drcom/chkstatus');
+  assert.equal(state.calls.some(call => call.url.pathname === '/drcom/logout'), false);
+  assert.equal(state.calls.at(-1).url.pathname, '/a79.htm');
+});
+
+test('portal-v4 device-only status cannot claim online and requires a fresh explicit page marker', async t => {
+  const { state, profile } = await portalV4Fixture(t, { statusReply: { result: 1, v46ip: '192.0.2.54' } });
+  assert.equal((await drcomEportalOperation(profile, 'status')).online, false);
+  assert.equal(state.calls.some(call => call.url.pathname === '/a79.htm'), true);
+  state.page = '<html>unrecognized portal state</html>';
+  await assert.rejects(drcomEportalOperation(profile, 'status'), { code: 'UNKNOWN_RESPONSE' });
+  state.statusReply = { result: 1, uid: 'synthetic-session-student', v46ip: 'invalid-address' };
+  await assert.rejects(drcomEportalOperation(profile, 'status'), { code: 'UNKNOWN_RESPONSE' });
+  state.statusReply = { result: 0, uid: 'synthetic-session-student', v46ip: state.ip };
+  await assert.rejects(drcomEportalOperation(profile, 'status'), { code: 'UNKNOWN_RESPONSE' });
+});
+
+test('portal-v4 recognizes only identity-bearing valid-IP API sessions without a page fallback', async t => {
+  const { state, profile } = await portalV4Fixture(t, { online: true });
+  const result = await drcomEportalOperation(profile, 'status');
+  assert.equal(result.online, true);
+  assert.equal(result.ip, state.ip);
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.calls[0].url.pathname, '/drcom/chkstatus');
+});

@@ -189,6 +189,9 @@ const http = require('node:http');
       assert.deepEqual(require('../electron/profiles.cjs').parseProfile(JSON.stringify(exported)), exported);
       if (protocol === 'ruijie') assert.ok(exported.ruijie.publicKey.modulus);
       if (protocol === 'drcom-eportal') {
+        assert.deepEqual(exported.drcomEportal, { variant: 'portal-v4', apiPort: 801 });
+        assert.equal(exported.fields[0].default, 'telecom');
+        assert.deepEqual(exported.fields[0].options.map(option => option.value), ['telecom', 'cmcc', 'unicom', 'xyw', 'raw']);
         await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, exportPath);
         await page.getByRole('button', { name: '导入连接方案', exact: true }).click();
         await expect.poll(async () => (await page.evaluate(() => window.campus.getSnapshot())).profiles.some(p => p.id === 'jdztc-copy')).toBe(true);

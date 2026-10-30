@@ -15,7 +15,7 @@
 
 `schemaVersion` 固定为 `1`。共有必填字段为 `id`、`name`、`version`、`homepage`、`protocol`。`description`、`author`、`timeoutMs` 可选。`timeoutMs` 默认 10000，范围为 1000 至 30000。
 
-`http` 必须配置 `operations`，`fields` 可选。`ruijie` 必须配置 `ruijie` 及含 `service` 的 `fields`，不得设置 `operations`；`service` 须有非空默认值或非空选项。`drcom` / `drcom-eportal` 使用应用内相应的受控适配器，不得设置 `operations`；可以从现有 Dr.COM 方案卡片导出 JSON 后修改配置并重新导入。景陶的 `drcom-eportal` 示例不声明自定义字段，也不使用锐捷配置。
+`http` 必须配置 `operations`，`fields` 可选。`ruijie` 必须配置 `ruijie` 及含 `service` 的 `fields`，不得设置 `operations`；`service` 须有非空默认值或非空选项。`drcom` / `drcom-eportal` 使用应用内相应的受控适配器，不得设置 `operations`；可以从现有 Dr.COM 方案卡片导出 JSON 后修改配置并重新导入。景陶的 `drcom-eportal` 示例声明新版 `drcomEportal` 配置及 `operator` 选项，不使用锐捷配置。
 
 每张方案卡片都有“导出 JSON”按钮，导出完整的方案定义，不包含当前输入的账号密码或临时设备参数。内置方案会使用不带 `builtin-` 前缀的副本 ID，外部方案保留原 ID。完整导出和导入流程见 [方案指南](../docs/plugin-guide.md)。
 
@@ -66,7 +66,9 @@
 
 内置“景德镇陶瓷大学 · Dr.COM ePortal”可直接选择；[jdztc-campus.example.json](jdztc-campus.example.json) 是同参数的外部副本，ID 为 `jdztc-campus`。也可通过内置卡片“导出 JSON”生成 ID 为 `jdztc-copy` 的副本。
 
-当前适配仅实现参考脚本的原始学号路径，使用前先手动连接 JCU / JCI；实际门户有运营商下拉框，其选项值与账号后缀映射尚待成功请求抓包核验，尚不宣称支持所有运营商。已知入口为 `http://172.29.0.2/a79.htm`。登录使用 `/eportal/?c=Portal&a=login`，账号字段为 `user_account=,0,原始学号`；只读状态和注销当前沿用 `/drcom/chkstatus`、`/drcom/logout`，并在操作后复核。未知响应、超时或 HTTP 错误不当作离线。上游没有提供景陶状态及注销接口证据，这些行为仍需校内验证。
+使用前先手动连接 JCU / JCI。新版配置为 `drcomEportal: { "variant": "portal-v4", "apiPort": 801 }`，已知入口仍为 `http://172.29.0.2/a79.htm`，登录使用同主机 801 端口 `/eportal/portal/login`。`operator` 默认 `telecom`（中国电信），另有 `cmcc`（中国移动）、`unicom`（中国联通）、`xyw`（学校原名“测试”）和 `raw`（其他）；四个网页选项分别补 `@telecom`、`@cmcc`、`@unicom`、`@xyw`，正确后缀不重复追加。“其他”保留用户输入的完整账号。密码仅 URL 编码，`jsVersion=4.2.1`，保留重复 `lang` 字段，AC IP 和名称按抓包留空。
+
+状态使用 80 端口 `/drcom/chkstatus` 及严格页面回退；兼容注销使用 801 端口裸 GET `/eportal/portal/logout`，操作后继续复核。只有充分的在线身份或明确页面标记才能确认状态，未知响应不当作离线。本次已取得实际登录请求、网页运营商选项及密码错误的失败响应，没有成功登录证据；状态和注销的景陶兼容性仍待验证。缺少 `drcomEportal` 的旧导入 JSON 保留旧流程，升级应用不会自动改写它们；需要新版时请切换内置方案或导入本示例。
 
 该协议为 `drcom-eportal`，与锐捷 `ruijie` ePortal Web 不同；上游 README 的“深澜”描述与实际登录脚本不一致。岚连仅参考公开认证地址和协议事实独立实现，没有复制上游源码。完整来源、许可说明及验证范围见 [景陶接入说明](../docs/jdztc-guide.md)。
 

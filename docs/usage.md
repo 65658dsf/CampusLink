@@ -12,19 +12,19 @@
 
 ## 安装和首次连接
 
-在 [GitHub Releases](https://github.com/65658dsf/CampusLink/releases) 按系统和处理器选择安装包。v1.1.3 的构建目标为：
+在 [GitHub Releases](https://github.com/65658dsf/CampusLink/releases) 按系统和处理器选择安装包。v1.1.4 的构建目标为：
 
 ```text
-Campus-Link-Setup-1.1.3.exe          Windows x64
-Campus-Link-1.1.3-mac-x64.dmg        Intel Mac
-Campus-Link-1.1.3-mac-arm64.dmg      Apple Silicon Mac
+Campus-Link-Setup-1.1.4.exe          Windows x64
+Campus-Link-1.1.4-mac-x64.dmg        Intel Mac
+Campus-Link-1.1.4-mac-arm64.dmg      Apple Silicon Mac
 ```
 
 macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程序”，再从该目录运行。默认构建未配置开发者签名或 Apple 公证，系统可能阻止打开；请核对来源并按照系统提示处理，不要关闭系统安全保护。未签名或未公证时，macOS 开机自启动也可能不可用。macOS 打包与系统行为仍需对应设备验证，不能将 CI 产物视为已完成校园网实测。
 
 1. Windows 运行安装程序并选择安装位置：浏览选择父目录时会自动追加 `Campus Link` 文件夹，手动输入的目录也会在安装前补全，已以该名称结尾时不会重复添加；macOS 安装到“应用程序”，然后打开“岚连 Campus Link”。
 2. 先在系统中连接校园 Wi-Fi，或插入校园网网线。本工具完成网络认证，不代替操作系统的无线网络连接功能。
-3. 首次打开会引导前往“连接方案”，搜索学校并点击“使用此方案”。贵州轻工职业大学的网络类型保持“校园网”；四川大学选择账号已开通的网络服务；成都理工大学（宜宾校区）无需选择服务；景德镇陶瓷大学当前仅提供参考脚本的原始学号路径，实际门户的运营商映射仍待核验，详见下方适配说明。其他学校请导入匹配方案，所有内置方案均直接展示。
+3. 首次打开会引导前往“连接方案”，搜索学校并点击“使用此方案”。贵州轻工职业大学的网络类型保持“校园网”；四川大学选择账号已开通的网络服务；成都理工大学（宜宾校区）无需选择服务；景德镇陶瓷大学选择学校网页对应的中国电信、中国移动、中国联通或“测试”，也可选“其他”填写完整账号，详见下方适配说明。其他学校请导入匹配方案，所有内置方案均直接展示。
 4. 选择方案后，应用会自动检测当前认证状态；以后启动沿用已保存的方案。若已通过认证，直接显示“已登录校园网”和会话详情，不再显示账号密码表单，也无须重复登录。未选择方案时不会请求学校认证服务器。
 5. 尚未认证时，输入学校提供的账号、密码，按需勾选“记住密码”，再点击连接按钮。
 
@@ -86,9 +86,9 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 
 ## 景德镇陶瓷大学适配情况
 
-在系统中先连接 JCU、JCI 等校园网，再选择“景德镇陶瓷大学 · Dr.COM ePortal”。当前适配仅实现参考脚本的原始学号路径；用户提供的真实页面截图显示“请选择运营商”下拉框，其选项值和账号后缀映射尚待成功请求抓包核验，尚不宣称支持所有运营商。应用提供登录、只读状态检测和注销流程；登录与注销请求被接受后，会再次查询状态确认结果。景陶使用独立的 `drcom-eportal` 适配器，与锐捷 ePortal Web 的协议不同。
+在系统中先连接 JCU、JCI 等校园网，再选择“景德镇陶瓷大学 · Dr.COM ePortal”。v1.1.4 根据用户提供的实际请求，将内置方案修正为同主机 801 端口的 `/eportal/portal/login`。按实际网页选择“中国电信”“中国移动”“中国联通”或“测试”，依次补上 `@telecom`、`@cmcc`、`@unicom`、`@xyw`；已有正确后缀时不重复追加。“测试”保留学校原名，不将它称为校园网；“其他”保留输入的完整账号。密码仅进行 URL 编码，AC IP 和名称按请求留空，使用 4.2.1 参数格式。
 
-本次接入依据公开脚本中的入口和登录请求独立实现，没有复制上游代码。上游没有提供景陶状态和注销接口的实测证据；当前使用 Dr.COM 的 `/drcom/chkstatus`、`/drcom/logout` 及严格页面标记回退，仍需在校内验证。超时、HTTP 错误和未知响应不会当作离线，也不会据此自动重连。完整流程、来源和验证边界见 [景陶接入说明](jdztc-guide.md)。
+状态使用 80 端口 `/drcom/chkstatus`：只有明确结果、非空在线账号及有效 IP 同时存在才据此确认在线，否则使用新读取页面的唯一状态标记复核。兼容注销使用 801 端口裸 GET `/eportal/portal/logout`，并继续查询确认离线。未知状态不触发自动重连。本次已对照真实登录请求和“云陶密码错误”的失败响应，但没有成功响应；成功登录、状态及注销兼容性仍待校内验证。若服务器提示“云陶密码错误，请登录云上陶大修改密码”，请按提示在“云上陶大”修改密码后重试。旧的导入 JSON 不会自动改成新版流程，需要切换内置方案或更新外部配置。完整来源和流程见 [景陶接入说明](jdztc-guide.md)。
 
 ## 密码与本地数据
 
@@ -117,7 +117,7 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 
 内置四川大学方案参考上游 ePortal Web 实现，支持确认在线、登录、注销及现有网络守护流程。它不是所有锐捷校园网的通用配置，也不支持锐捷 802.1X 客户端认证；其他学校需要替换入口、跳转源、服务值和公钥。当前只完成源码对照与本地模拟服务验证，**未在四川大学真实网络验证**。来源提交和第三方许可见 [锐捷方案教程](ruijie-guide.md#参考来源与许可) 与 [第三方声明](../assets/licenses/README.md)。
 
-`drcom` / `drcom-eportal` / `ruijie` 方案可使用顶层 `portalDiscovery: { "url": "http://www.msftconnecttest.com/redirect" }` 开启网络入口发现；内置方案、锐捷示例与景陶示例默认配置。`homepage` 仍是必须填写的已知回退地址，`ruijie.discoveryUrl` 保留为与它同源的已知发现入口。发现功能不会自动识别所有校园网协议，也不会替你选择其他学校的服务或 RSA 公钥。v1.1.3 的更新与验收边界见 [发布说明](releases-v1.1.3.md)，景陶接入另见 [接入说明](jdztc-guide.md)。
+`drcom` / `drcom-eportal` / `ruijie` 方案可使用顶层 `portalDiscovery: { "url": "http://www.msftconnecttest.com/redirect" }` 开启网络入口发现；内置方案、锐捷示例与景陶示例默认配置。`homepage` 仍是必须填写的已知回退地址，`ruijie.discoveryUrl` 保留为与它同源的已知发现入口。景陶新版通过 `drcomEportal: { "variant": "portal-v4", "apiPort": 801 }` 显式使用同主机 801 端口；旧 JSON 省略此配置时保留旧流程。发现功能不会自动识别所有校园网协议，也不会替你选择其他学校的服务或 RSA 公钥。v1.1.4 的更新与验收边界见 [发布说明](releases-v1.1.4.md)。
 
 ## 本地开发
 
@@ -161,13 +161,13 @@ npm test
 npm run dist:win
 ```
 
-安装程序输出到 `release/Campus-Link-Setup-1.1.3.exe`；只构建应用目录时，入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包必须在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。所有打包命令明确禁用自动上传。`dist/` 是界面构建产物，不能替代完整桌面程序。
+安装程序输出到 `release/Campus-Link-Setup-1.1.4.exe`；只构建应用目录时，入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包必须在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。所有打包命令明确禁用自动上传。`dist/` 是界面构建产物，不能替代完整桌面程序。
 
 自动化测试使用本机模拟服务和模拟凭据，覆盖方案校验、HTTP 编码、JSONP 解析、响应判定、加密存储流程、自动连接约束等。测试不会向真实校园网提交认证或注销，也不能替代真实账号的连接验收。
 
 ## GitHub Actions 自动发布
 
-推送到 `main` 或提交 PR 会运行 Linux 单元测试、发布流程检查和界面构建。发布版本时，将 `package.json` 与 `package-lock.json` 的版本一起更新并合入 `main`，再推送匹配的标签，例如 `v1.1.3`。工作流确认标签提交属于 `main` 后，分别在 Windows、Intel Mac 和 Apple Silicon Mac runner 构建；全部成功后由独立发布任务统一上传到 GitHub Releases。
+推送到 `main` 或提交 PR 会运行 Linux 单元测试、发布流程检查和界面构建。发布版本时，将 `package.json` 与 `package-lock.json` 的版本一起更新并合入 `main`，再推送匹配的标签，例如 `v1.1.4`。工作流确认标签提交属于 `main` 后，分别在 Windows、Intel Mac 和 Apple Silicon Mac runner 构建；全部成功后由独立发布任务统一上传到 GitHub Releases。
 
 普通提交不会创建 Release。也可在 Actions → Desktop CI and Release → Run workflow 中选择 `main`，输入已存在且版本匹配的标签重试。没有 Apple secrets 时仍会生成未签名产物；配置完整证书及公证凭据后才启用对应步骤。完整配置、发布命令和失败恢复见 [发布指南](releases.md)。
 

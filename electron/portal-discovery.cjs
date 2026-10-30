@@ -20,10 +20,12 @@ function safeTarget(value, base, { formOriginOnly = false } = {}) {
   let url;
   try { url = new URL(value, base); } catch { return null; }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) return null;
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname); } catch { return null; }
   // Some Dr.COM actions use GET. Discovery must never execute them, even
   // when the redirect carries no account or password.
-  if (!formOriginOnly && (/^\/(?:drcom\/(?:login|logout)|F\.htm)\/?$/i.test(url.pathname) ||
-      (/^\/eportal\/?$/i.test(url.pathname) && /^(?:login|logout)$/i.test(url.searchParams.get('a') || '')))) return null;
+  if (!formOriginOnly && (/^\/(?:drcom\/(?:login|logout)|eportal\/portal\/(?:login|logout)|F\.htm)\/?$/i.test(pathname) ||
+      (/^\/eportal\/?$/i.test(pathname) && /^(?:login|logout)$/i.test(url.searchParams.get('a') || '')))) return null;
   // Discovery never sends account credentials, even if a redirect contains
   // them. Do not silently turn an authenticated URL into an apparent probe.
   for (const [key] of url.searchParams) if (CREDENTIAL_KEY.test(key.replace(/[^a-z0-9]/gi, ''))) return null;

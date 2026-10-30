@@ -2,12 +2,45 @@
   "schemaVersion": 1,
   "id": "jdztc-campus",
   "name": "景德镇陶瓷大学 · Dr.COM ePortal",
-  "description": "参考景德镇陶瓷大学校园网脚本的 Dr.COM ePortal 请求实现；请先连接 JCU、JCI 等校园网络，填写原始学号，不追加运营商后缀。当前接入仍需校内验证。",
-  "version": "1.0.0",
+  "description": "依据真实网页选项和电信请求适配 Dr.COM ePortal；先连接 JCU、JCI 等校园网络，选择对应运营商，填写学号和云陶密码。已有匹配后缀不会重复添加，完整账号模式保留输入；校内成功认证仍需验证。",
+  "version": "1.1.0",
   "author": "NingMeng123",
   "homepage": "http://172.29.0.2/a79.htm",
   "protocol": "drcom-eportal",
   "timeoutMs": 10000,
+  "drcomEportal": {
+    "variant": "portal-v4",
+    "apiPort": 801
+  },
+  "fields": [
+    {
+      "key": "operator",
+      "label": "运营商",
+      "default": "telecom",
+      "options": [
+        {
+          "label": "中国电信",
+          "value": "telecom"
+        },
+        {
+          "label": "中国移动",
+          "value": "cmcc"
+        },
+        {
+          "label": "中国联通",
+          "value": "unicom"
+        },
+        {
+          "label": "测试",
+          "value": "xyw"
+        },
+        {
+          "label": "其他（使用完整账号）",
+          "value": "raw"
+        }
+      ]
+    }
+  ],
   "portalDiscovery": {
     "url": "http://www.msftconnecttest.com/redirect"
   }

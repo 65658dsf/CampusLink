@@ -76,12 +76,21 @@ function registerIpc() {
     const discovery = profile.portalDiscovery
       ? `自动发现入口：${profile.portalDiscovery.url}\n应用将探测当前网络的真实认证服务器，并仅向识别出且协议匹配的认证服务器提交账号和密码。\n备用认证页：${profile.homepage}\n\n`
       : '';
+    let eportalLogin, eportalLogout;
+    if (profile.protocol === 'drcom-eportal') {
+      eportalLogin = new URL(profile.drcomEportal ? '/eportal/portal/login' : '/eportal/?c=Portal&a=login', profile.homepage);
+      eportalLogout = new URL(profile.drcomEportal ? '/eportal/portal/logout' : '/drcom/logout', profile.homepage);
+      if (profile.drcomEportal) {
+        eportalLogin.port = String(profile.drcomEportal.apiPort);
+        eportalLogout.port = String(profile.drcomEportal.apiPort);
+      }
+    }
     const endpoints = profile.protocol === 'ruijie'
       ? `${profile.portalDiscovery ? '备用网关' : '锐捷'}发现入口：${profile.ruijie.discoveryUrl}\n${profile.portalDiscovery ? '备用网关允许的' : '允许的'}只读发现跳转来源：\n${[new URL(profile.homepage).origin, ...profile.ruijie.redirectOrigins].join('\n')}\n${profile.portalDiscovery ? '备用' : ''}认证接口：${new URL('/eportal/InterFace.do', profile.homepage).href}\n${profile.portalDiscovery ? '' : '账号和加密后的密码只提交到上述认证接口。\n'}服务名称编码：${profile.ruijie.serviceEncoding === 'percent' ? '百分号编码' : '原始文本'}`
       : profile.protocol === 'drcom'
         ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM 接口：\n${['login', 'logout', 'chkstatus'].map(name => `GET ${new URL(`/drcom/${name}`, profile.homepage).href}`).join('\n')}\n使用应用内置的 Dr.COM 请求与状态确认流程。`
       : profile.protocol === 'drcom-eportal'
-        ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM ePortal 接口：\nGET ${new URL('/eportal/?c=Portal&a=login', profile.homepage).href}\n${['chkstatus', 'logout'].map(name => `GET ${new URL(`/drcom/${name}`, profile.homepage).href}`).join('\n')}\n使用应用内置的 ePortal 登录与 Dr.COM 状态确认、注销流程，原始学号不追加运营商后缀。`
+        ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM ePortal 接口：\nGET ${eportalLogin.href}\nGET ${new URL('/drcom/chkstatus', profile.homepage).href}\nGET ${eportalLogout.href}\n${profile.drcomEportal ? `登录和注销接口仅将认证页同一主机的端口改为 ${profile.drcomEportal.apiPort}；运营商模式追加对应后缀，完整账号模式不追加。` : '使用旧版 ePortal 原始账号登录流程。'}状态确认使用认证页原端口；注销不发送账号密码。`
         : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`;
     const confirmation = await dialog.showMessageBox(win, {
       type: 'question', title: '确认导入连接方案', message: `导入「${profile.name}」？`,

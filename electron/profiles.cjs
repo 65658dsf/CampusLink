@@ -4,7 +4,8 @@ const MAX_PROFILE_BYTES = 64 * 1024;
 const RESERVED = new Set(['__proto__', 'prototype', 'constructor']);
 const BASE_VARIABLES = ['username', 'password', 'ip', 'mac', 'acIp', 'acName'];
 const DEFAULT_PORTAL_DISCOVERY_URL = 'http://www.msftconnecttest.com/redirect';
-const PROFILE_KEYS = ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'portalDiscovery'];
+const DRCOM_EPORTAL_OPERATORS = ['telecom', 'cmcc', 'unicom', 'xyw', 'raw'];
+const PROFILE_KEYS = ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'drcomEportal', 'portalDiscovery'];
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -115,6 +116,12 @@ function validateProfile(value, { builtin = false } = {}) {
   const homepage = safeUrl(value.homepage, '认证页地址');
   if (!['drcom', 'http', 'ruijie', 'drcom-eportal'].includes(value.protocol)) fail('protocol 仅支持 drcom / http / ruijie / drcom-eportal');
   if (value.protocol !== 'ruijie' && Object.hasOwn(value, 'ruijie')) fail('仅锐捷方案可声明 ruijie 配置');
+  if (Object.hasOwn(value, 'drcomEportal')) {
+    if (value.protocol !== 'drcom-eportal') fail('仅 Dr.COM ePortal 方案可声明 drcomEportal 配置');
+    keys(value.drcomEportal, ['variant', 'apiPort'], 'drcomEportal');
+    if (value.drcomEportal.variant !== 'portal-v4') fail('drcomEportal.variant 必须为 portal-v4');
+    if (!Number.isInteger(value.drcomEportal.apiPort) || value.drcomEportal.apiPort < 1 || value.drcomEportal.apiPort > 65535) fail('drcomEportal.apiPort 必须为 1–65535 的整数');
+  }
   if (Object.hasOwn(value, 'portalDiscovery')) {
     if (!['drcom', 'ruijie', 'drcom-eportal'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie / drcom-eportal 方案');
     keys(value.portalDiscovery, ['url'], '认证页自动发现');
@@ -157,6 +164,14 @@ function validateProfile(value, { builtin = false } = {}) {
     }
   }
   if (value.protocol === 'ruijie') validateRuijie(value.ruijie, homepage, value.fields);
+  if (value.drcomEportal?.variant === 'portal-v4') {
+    const operator = value.fields?.find(field => field.key === 'operator');
+    if (operator) {
+      if (operator.default === undefined && !operator.options) fail('Dr.COM ePortal operator 字段须提供默认值或选项');
+      const values = [operator.default, ...(operator.options || []).map(option => option.value)].filter(item => item !== undefined);
+      if (values.some(item => !DRCOM_EPORTAL_OPERATORS.includes(item))) fail('Dr.COM ePortal operator 仅支持 telecom / cmcc / unicom / xyw / raw');
+    }
+  }
   const result = JSON.parse(JSON.stringify(value));
   if (result.protocol === 'ruijie') {
     result.ruijie.discoveryUrl ??= result.homepage;
@@ -203,6 +218,7 @@ function profileParameters(profile, input = {}) {
     const value = input[field.key] ?? field.default ?? field.options?.[0]?.value ?? '';
     if (typeof value !== 'string' || value.length > 500 || /[\r\n\u0000]/.test(value)) fail(`${field.label} 无效`);
     if (field.options && !field.options.some(x => x.value === value)) fail(`${field.label} 不在可选范围内`);
+    if (profile.drcomEportal?.variant === 'portal-v4' && field.key === 'operator' && !DRCOM_EPORTAL_OPERATORS.includes(value)) fail(`${field.label} 仅支持 telecom / cmcc / unicom / xyw / raw`);
     result[field.key] = value;
   }
   for (const key of Object.keys(input)) if (!(profile.fields || []).some(x => x.key === key)) fail('连接参数含有未声明字段');
@@ -273,9 +289,17 @@ const builtinJdztcProfile = validateProfile({
   schemaVersion: 1,
   id: 'builtin-jdztc',
   name: '景德镇陶瓷大学 · Dr.COM ePortal',
-  description: '参考景德镇陶瓷大学校园网脚本的 Dr.COM ePortal 请求实现；请先连接 JCU、JCI 等校园网络，填写原始学号，不追加运营商后缀。当前接入仍需校内验证。',
-  version: '1.0.0', author: 'NingMeng123', homepage: 'http://172.29.0.2/a79.htm',
+  description: '依据真实网页选项和电信请求适配 Dr.COM ePortal；先连接 JCU、JCI 等校园网络，选择对应运营商，填写学号和云陶密码。已有匹配后缀不会重复添加，完整账号模式保留输入；校内成功认证仍需验证。',
+  version: '1.1.0', author: 'NingMeng123', homepage: 'http://172.29.0.2/a79.htm',
   protocol: 'drcom-eportal', timeoutMs: 10000,
+  drcomEportal: { variant: 'portal-v4', apiPort: 801 },
+  fields: [{ key: 'operator', label: '运营商', default: 'telecom', options: [
+    { label: '中国电信', value: 'telecom' },
+    { label: '中国移动', value: 'cmcc' },
+    { label: '中国联通', value: 'unicom' },
+    { label: '测试', value: 'xyw' },
+    { label: '其他（使用完整账号）', value: 'raw' },
+  ] }],
   portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
 }, { builtin: true });
 

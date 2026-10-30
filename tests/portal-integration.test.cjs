@@ -76,7 +76,7 @@ test('a discovered protocol mismatch blocks login instead of falling back to an 
   assert.equal(posts, 0);
 });
 
-test('JCU discovers a changed gateway, authenticates with current device parameters and verifies logout', async t => {
+test('legacy JCU profiles discover a changed gateway, authenticate with current device parameters and verify logout', async t => {
   const calls = [];
   const gateways = [];
   const makeGateway = async name => {
@@ -112,6 +112,7 @@ test('JCU discovers a changed gateway, authenticates with current device paramet
     res.writeHead(302, { Location: target, 'Set-Cookie': 'probe-session=never-copy' }); res.end();
   });
   const profile = { ...builtinJdztcProfile, id: `jcu-discovery-${new URL(probe).port}`, homepage: 'http://must-not-contact.example.invalid/a79.htm', portalDiscovery: { url: `${probe}/redirect` } };
+  delete profile.drcomEportal;
   const credentials = { username: 'local-student', password: 'local pass&+密', parameters: {} };
   assert.equal((await runOperation(profile, 'login', credentials)).portalUrl, `${first}/`);
   target = 'https://www.msn.com/';
@@ -129,4 +130,85 @@ test('JCU discovers a changed gateway, authenticates with current device paramet
   const probes = calls.filter(call => call.name === 'probe');
   assert.ok(probes.every(call => call.url === '/redirect'));
   assert.deepEqual(calls.filter(call => call.url.startsWith('/eportal/')).map(call => call.name), ['first', 'second']);
+});
+
+test('JCU v4 discovery keeps the API port explicit and verifies identity-free status against the fresh portal', async t => {
+  const calls = [];
+  let online = false;
+  const api = await server(t, (req, res) => {
+    const url = new URL(req.url, 'http://local.invalid');
+    calls.push({ destination: 'api', url, headers: req.headers });
+    if (url.pathname === '/eportal/portal/login') {
+      assert.equal(url.searchParams.get('user_account'), ',0,synthetic-student@telecom');
+      assert.equal(url.searchParams.get('wlan_user_ip'), '192.0.2.200');
+      assert.equal(url.searchParams.get('wlan_ac_ip'), '');
+      assert.equal(url.searchParams.get('wlan_ac_name'), '');
+      assert.deepEqual(url.searchParams.getAll('lang'), ['zh-cn', 'zh']);
+      online = true;
+    } else if (url.pathname === '/eportal/portal/logout') {
+      assert.equal(url.search, '');
+      online = false;
+    } else assert.fail(`Unexpected authentication path: ${url.pathname}`);
+    res.end('dr1003({"result":1})');
+  });
+  const portal = await server(t, (req, res) => {
+    const url = new URL(req.url, 'http://local.invalid');
+    calls.push({ destination: 'portal', url, headers: req.headers });
+    if (url.pathname === '/drcom/chkstatus') {
+      // Some v4 gateways return result=1 and an IP even before authentication.
+      res.end('dr1003({"result":1,"v46ip":"192.0.2.200"})');
+    } else if (url.pathname === '/a79.htm') {
+      res.end(`<html><!--Dr.COMWebLoginID_${online ? 1 : 0}.htm--><form><input name="DDDDD"><input name="upass"></form></html>`);
+    } else assert.fail(`Unexpected portal path: ${url.pathname}`);
+  });
+  const entry = `${portal}/a79.htm?userip=192.0.2.200&wlanacip=192.0.2.1&wlanacname=Ignored&usermac=synthetic-device`;
+  let target = entry;
+  const probe = await server(t, (req, res) => {
+    calls.push({ destination: 'probe', url: new URL(req.url, 'http://local.invalid'), headers: req.headers });
+    res.writeHead(302, { Location: target }); res.end();
+  });
+  const profile = {
+    ...builtinJdztcProfile,
+    id: `jcu-v4-${new URL(probe).port}`,
+    homepage: 'http://must-not-contact.example.invalid/a79.htm',
+    portalDiscovery: { url: `${probe}/redirect` },
+    drcomEportal: { variant: 'portal-v4', apiPort: Number(new URL(api).port) },
+  };
+  const before = JSON.stringify(profile);
+  assert.equal((await runOperation(profile, 'status')).online, false, 'A result-only IP response must not report online');
+  assert.equal((await runOperation(profile, 'login', { username: 'synthetic-student', password: 'synthetic-secret', parameters: { operator: 'telecom' } })).online, true);
+  target = 'https://www.msn.com/';
+  assert.equal((await runOperation(profile, 'status')).online, true);
+  assert.equal((await runOperation(profile, 'logout')).online, false);
+  assert.equal(JSON.stringify(profile), before);
+  for (const call of calls) {
+    assert.equal(call.headers.cookie, undefined);
+    assert.equal(call.headers.authorization, undefined);
+    if (call.destination === 'api') {
+      assert.equal(call.headers.host, new URL(api).host);
+      assert.equal(call.headers.referer, `${portal}/`);
+    } else assert.equal(call.url.searchParams.has('user_password'), false);
+  }
+  assert.equal(calls.filter(call => call.destination === 'api').length, 2);
+});
+
+test('JCU v4 errors redact the carrier account and password from summaries and diagnostics', async () => {
+  const profile = { ...builtinJdztcProfile, portalDiscovery: undefined };
+  const username = 'synthetic-sensitive-account';
+  const password = 'synthetic-sensitive-password';
+  const account = `,0,${username}@telecom`;
+  const requester = async (url, options) => {
+    options.onResponse?.({ status: 200 });
+    if (url.pathname === '/a79.htm') return '<html><!--Dr.COMWebLoginID_0.htm--></html>';
+    return `dr1003(${JSON.stringify({ result: 0, message: `${account} ${password}`, user_account: account })})`;
+  };
+  await assert.rejects(runOperation(profile, 'login', { username, password, parameters: { operator: 'telecom' } }, requester), error => {
+    assert.equal(error.code, 'AUTH_REJECTED');
+    const rendered = JSON.stringify({ message: error.message, diagnostics: error.diagnostics });
+    assert.equal(rendered.includes(username), false);
+    assert.equal(rendered.includes(password), false);
+    assert.equal(rendered.includes(account), false);
+    assert.ok(error.diagnostics.length);
+    return true;
+  });
 });

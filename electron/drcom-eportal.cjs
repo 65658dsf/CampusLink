@@ -9,6 +9,7 @@ const { htmlTarget } = require('./ruijie.cjs');
 
 const MAX_HOPS = 6;
 const PRIVATE_QUERY = /^(?:username|user|userid|useraccount|userpassword|account|accountname|accountid|loginname|ddddd|upass|password|passwd|pwd|token|accesstoken|refreshtoken|secret|authorization|cookie|credential|credentials)$/i;
+const OPERATOR_SUFFIXES = Object.freeze({ telecom: '@telecom', cmcc: '@cmcc', unicom: '@unicom', xyw: '@xyw' });
 
 function entryUrl(value, base, origin) {
   let url;
@@ -73,6 +74,18 @@ function resultAccepted(data) {
 async function drcomEportalOperation(profile, operation, context = {}, requester = portalRequest, registerSecret = () => {}) {
   if (!['login', 'logout', 'status'].includes(operation)) throw new CampusError('不支持的 Dr.COM ePortal 操作。', 'UNSUPPORTED_OPERATION');
   const origin = new URL(profile.homepage).origin;
+  const portalV4 = profile.drcomEportal?.variant === 'portal-v4';
+  if (profile.drcomEportal && !portalV4) throw new CampusError('Dr.COM ePortal 协议配置无效。', 'INVALID_PROFILE');
+  const gateway = new URL(profile.homepage);
+  if (portalV4) {
+    const port = profile.drcomEportal.apiPort;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new CampusError('Dr.COM ePortal 接口端口无效。', 'INVALID_PROFILE');
+    // The captured API uses another port on the portal's own host. A profile
+    // can choose that port, but cannot redirect credentials to another host.
+    gateway.port = String(port);
+  }
+  const jsVersion = portalV4 ? '4.2.1' : '3.3.2';
+  const referer = portalV4 ? `${origin}/` : profile.homepage;
   const secrets = [];
   const remember = value => { if (typeof value === 'string' && value && !secrets.includes(value)) { secrets.push(value); registerSecret(value); } };
   remember(context.username); remember(context.password);
@@ -82,7 +95,7 @@ async function drcomEportalOperation(profile, operation, context = {}, requester
     try {
       const body = await requester(url, {
         method: 'GET', ...options,
-        headers: { Accept: '*/*', 'Cache-Control': 'no-cache', Referer: profile.homepage, ...options.headers },
+        headers: { Accept: '*/*', 'Cache-Control': 'no-cache', Referer: referer, ...options.headers },
         diagnosticSecrets: secrets,
         onResponse: value => { metadata = value; },
       }, profile.timeoutMs || 10000);
@@ -134,7 +147,7 @@ async function drcomEportalOperation(profile, operation, context = {}, requester
   }
 
   async function status() {
-    const url = apiUrl(profile.homepage, '/drcom/chkstatus', [['callback', 'dr1003'], ['jsVersion', '3.3.2'], ['v', Date.now()]]);
+    const url = apiUrl(profile.homepage, '/drcom/chkstatus', [['callback', 'dr1003'], ['jsVersion', jsVersion], ['v', Date.now()]]);
     let response;
     try { response = await send(url); }
     catch (error) {
@@ -145,6 +158,18 @@ async function drcomEportalOperation(profile, operation, context = {}, requester
     if (/<(?:!doctype\b|html(?:\s|>))/i.test(response.body)) return pageStatus((await landing()).body);
     const data = parseJsonOrJsonp(response.body);
     if (!data || typeof data !== 'object' || Array.isArray(data) || !Object.hasOwn(data, 'result')) throw new CampusError('无法确认 Dr.COM 在线状态，请打开认证页检查。', 'UNKNOWN_RESPONSE');
+    if (portalV4 && [1, '1', 0, '0'].includes(data.result)) {
+      // Some v4 gateways return result=1 merely to report a device address.
+      // A session identity and valid address are needed to establish online;
+      // otherwise use an independent, fresh portal page as the state source.
+      const uid = typeof data.uid === 'string' ? data.uid.trim() : '';
+      if ([1, '1'].includes(data.result) && uid && typeof data.v46ip === 'string' && isIP(data.v46ip)) {
+        remember(data.uid);
+        return statusResult(true, data);
+      }
+      if ([0, '0'].includes(data.result) && uid) throw new CampusError('Dr.COM 在线状态与会话信息不一致，请打开认证页检查。', 'UNKNOWN_RESPONSE');
+      return pageStatus((await landing()).body);
+    }
     if ([1, '1'].includes(data.result)) return statusResult(true, data);
     if ([0, '0'].includes(data.result)) return statusResult(false);
     throw new CampusError('无法确认 Dr.COM 在线状态，请打开认证页检查。', 'UNKNOWN_RESPONSE');
@@ -154,6 +179,20 @@ async function drcomEportalOperation(profile, operation, context = {}, requester
   let url;
   if (operation === 'login') {
     if (!context.username || !context.password || typeof context.username !== 'string' || typeof context.password !== 'string') throw new CampusError('请填写校园网账号和密码。', 'INVALID_PARAMETERS');
+    let username = context.username;
+    if (portalV4) {
+      const field = profile.fields?.find(item => item.key === 'operator');
+      const operator = context.parameters?.operator ?? field?.default ?? field?.options?.[0]?.value ?? 'raw';
+      if (typeof operator !== 'string' || operator !== 'raw' && !Object.hasOwn(OPERATOR_SUFFIXES, operator)) throw new CampusError('请选择已支持的运营商或完整账号模式。', 'INVALID_PARAMETERS');
+      if (operator !== 'raw') {
+        const suffix = OPERATOR_SUFFIXES[operator];
+        const alreadySuffixed = username.toLowerCase().endsWith(suffix);
+        if (username.includes('@') && !alreadySuffixed) throw new CampusError('账号后缀与所选运营商不一致，请更正账号或切换完整账号模式。', 'INVALID_PARAMETERS');
+        if (!alreadySuffixed) username += suffix;
+      }
+    }
+    const account = `,0,${username}`;
+    remember(username); remember(account);
     const page = await landing(true);
     let currentStatus;
     try { currentStatus = pageStatus(page.body); }
@@ -163,18 +202,24 @@ async function drcomEportalOperation(profile, operation, context = {}, requester
       if (/<!--\s*Dr\.COMWebLoginID_/i.test(pageHtml(page.body)) || !isLoginPage(page.body)) throw new CampusError('无法识别 Dr.COM 登录页面，未提交账号密码。', 'UNKNOWN_RESPONSE');
     }
     if (currentStatus?.online) return { ...currentStatus, message: '当前设备已通过校园网认证，无需重复登录。' };
-    const account = `,0,${context.username}`;
-    remember(account);
-    url = apiUrl(profile.homepage, '/eportal/', [
+    url = portalV4 ? apiUrl(gateway, '/eportal/portal/login', [
+      ['callback', 'dr1003'], ['login_method', '1'],
+      ['user_account', account], ['user_password', context.password],
+      ['wlan_user_ip', page.ip], ['wlan_user_ipv6', ''], ['wlan_user_mac', '000000000000'],
+      // The real request keeps both AC fields empty even though the landing
+      // query may contain an AC address. Preserve that wire behavior.
+      ['wlan_ac_ip', ''], ['wlan_ac_name', ''], ['jsVersion', jsVersion],
+      ['terminal_type', '1'], ['lang', 'zh-cn'], ['v', Math.floor(Math.random() * 9000 + 1000)], ['lang', 'zh'],
+    ]) : apiUrl(profile.homepage, '/eportal/', [
       ['c', 'Portal'], ['a', 'login'], ['callback', 'dr1003'], ['login_method', '1'],
       ['user_account', account], ['user_password', context.password],
       ['wlan_user_ip', page.ip], ['wlan_user_ipv6', ''], ['wlan_user_mac', '000000000000'],
       ['wlan_ac_ip', page.acIp], ['wlan_ac_name', page.acName], ['jsVersion', '3.3.2'], ['v', Date.now()],
     ]);
   } else {
-    // JCU's reference does not publish an ePortal logout request. Reuse the
-    // existing Dr.COM endpoint and independently verify the resulting state.
-    url = apiUrl(profile.homepage, '/drcom/logout', [['callback', 'dr1003'], ['jsVersion', '3.3.2'], ['v', Date.now()]]);
+    // V4's compatible public implementation uses a bare same-host API GET.
+    // Keep legacy definitions on their existing Dr.COM logout endpoint.
+    url = portalV4 ? apiUrl(gateway, '/eportal/portal/logout') : apiUrl(profile.homepage, '/drcom/logout', [['callback', 'dr1003'], ['jsVersion', jsVersion], ['v', Date.now()]]);
   }
   const data = parseJsonOrJsonp((await send(url)).body);
   if (!resultAccepted(data)) {
