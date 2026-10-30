@@ -1,0 +1,35 @@
+# 岚连 Campus Link v1.1.3
+
+开发者：**NingMeng123** · [项目主页](https://campuslink.xzncraft.cn/) · [开源仓库](https://github.com/65658dsf/CampusLink)
+
+本版新增景德镇陶瓷大学校园网方案，并修复 Windows 自定义安装目录的补全行为。
+
+## 本版更新
+
+- **新增景德镇陶瓷大学 · Dr.COM ePortal 方案。** 先连接 JCU / JCI 等校园网络，再使用原始学号和校园网密码认证，无需追加运营商后缀。适配器依据公开协议字段独立实现，未复制上游自动化脚本。
+- **动态读取当前设备参数。** 从本次认证入口获取 `userip`、`wlanacip` 和 `wlanacname`，支持空控制器名称；临时查询参数不会写入方案或设置。
+- **严格确认认证结果。** 登录与注销请求被接受后继续查询状态；未知响应、冲突页面标记及网络错误不会当作离线或认证成功，也不会据此自动重连。发现过程限制跳转目标，并忽略页面中的登录、注销辅助函数字面量。
+- **补齐方案管理与排障。** 新方案支持学校搜索、JSON 导入导出和已有网络守护流程；完善 ePortal 账号、密码与设备字段的诊断脱敏，提供[接入说明](https://github.com/65658dsf/CampusLink/blob/v1.1.3/docs/jdztc-guide.md)和可导入示例。
+- **修复 Windows 安装目录。** 选择或手动输入父目录时自动补上 `Campus Link` 文件夹；已以该名称结尾时不会重复添加。
+
+## 安装与升级
+
+在 [本版本 Releases](https://github.com/65658dsf/CampusLink/releases/tag/v1.1.3) 按系统与处理器选择：
+
+| 文件 | 适用设备 |
+| --- | --- |
+| `Campus-Link-Setup-1.1.3.exe` | Windows x64 |
+| `Campus-Link-1.1.3-mac-x64.dmg` / `.zip` | Intel Mac |
+| `Campus-Link-1.1.3-mac-arm64.dmg` / `.zip` | Apple Silicon Mac |
+
+已有用户沿用已保存的方案、加密凭据与检测间隔。需要使用景陶方案时，到“连接方案”搜索学校并主动选择。
+
+## 验证范围
+
+认证逻辑已通过本机模拟服务验证，尚未在景德镇陶瓷大学真实校园网完成验收。状态查询和注销目前沿用 Dr.COM 的 `/drcom/chkstatus`、`/drcom/logout` 及严格页面标记回退，仍需校内确认。入口中的长 `usermac` 标识是否参与提交尚无实测依据；当前登录请求遵循参考脚本，使用 `wlan_user_mac=000000000000`。
+
+自动化检查覆盖认证适配、入口发现、诊断脱敏、方案校验、发布脚本、TypeScript、界面构建及 Windows 本机模拟服务桌面流程。模拟服务检查不代表已通过真实账号认证。
+
+Windows 当前未配置代码签名。macOS 签名与公证状态以本次构建记录为准；未签名或未公证时系统可能阻止打开，开机自启动也可能不可用。macOS 校园认证、钥匙串、登录项及安装行为仍需真机验收。
+
+`build-info.json` 记录源码提交、平台与签名状态；`SHA256SUMS.txt` 提供安装文件和构建记录的校验值。

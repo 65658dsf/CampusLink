@@ -5,7 +5,7 @@ const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
 const REDACTED = '[已隐藏]';
 const TRUNCATED = '\n[响应内容已截断]';
 const SENSITIVE_KEY = /^(?:ddddd|upass|pwd|pass|password|passwd|passphrase|username|user|userid|uid|account|accountname|accountid|loginname|studentid|phone|mobile|telephone|email|mail|credential|credentials|secret|token|accesstoken|refreshtoken|idtoken|authorization|auth|cookie|setcookie|session|sessionid|jsessionid|csrf|csrftoken|xsrf|xsrftoken|apikey|ac0|ss1|ss4|mac|usermac|clientmac|macaddress)$/i;
-const isSensitiveKey = key => SENSITIVE_KEY.test(String(key).replace(/[^a-z0-9]/gi, '')) || /^(?:userindex|querystring|operatoruserid|operatorpwd)$/i.test(String(key).replace(/[^a-z0-9]/gi, '')) || /(?:password|token|secret|cookie|authorization)/i.test(key);
+const isSensitiveKey = key => SENSITIVE_KEY.test(String(key).replace(/[^a-z0-9]/gi, '')) || /^(?:useraccount|wlanusermac|userindex|querystring|operatoruserid|operatorpwd)$/i.test(String(key).replace(/[^a-z0-9]/gi, '')) || /(?:password|token|secret|cookie|authorization)/i.test(key);
 const ENTITY = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', colon: ':', sol: '/', equals: '=' };
 const ENCODED = /(?:%[a-f\d]{2})+|&#(?:x[a-f\d]+|\d+);?|&(?:amp|lt|gt|quot|apos|nbsp|colon|sol|equals);|\\u\{[a-f\d]{1,6}\}|\\u[a-f\d]{4}|\\x[a-f\d]{2}|\\["'\\/bfnrt]/gi;
 

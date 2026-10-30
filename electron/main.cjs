@@ -80,6 +80,8 @@ function registerIpc() {
       ? `${profile.portalDiscovery ? '备用网关' : '锐捷'}发现入口：${profile.ruijie.discoveryUrl}\n${profile.portalDiscovery ? '备用网关允许的' : '允许的'}只读发现跳转来源：\n${[new URL(profile.homepage).origin, ...profile.ruijie.redirectOrigins].join('\n')}\n${profile.portalDiscovery ? '备用' : ''}认证接口：${new URL('/eportal/InterFace.do', profile.homepage).href}\n${profile.portalDiscovery ? '' : '账号和加密后的密码只提交到上述认证接口。\n'}服务名称编码：${profile.ruijie.serviceEncoding === 'percent' ? '百分号编码' : '原始文本'}`
       : profile.protocol === 'drcom'
         ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM 接口：\n${['login', 'logout', 'chkstatus'].map(name => `GET ${new URL(`/drcom/${name}`, profile.homepage).href}`).join('\n')}\n使用应用内置的 Dr.COM 请求与状态确认流程。`
+      : profile.protocol === 'drcom-eportal'
+        ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM ePortal 接口：\nGET ${new URL('/eportal/?c=Portal&a=login', profile.homepage).href}\n${['chkstatus', 'logout'].map(name => `GET ${new URL(`/drcom/${name}`, profile.homepage).href}`).join('\n')}\n使用应用内置的 ePortal 登录与 Dr.COM 状态确认、注销流程，原始学号不追加运营商后缀。`
         : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`;
     const confirmation = await dialog.showMessageBox(win, {
       type: 'question', title: '确认导入连接方案', message: `导入「${profile.name}」？`,

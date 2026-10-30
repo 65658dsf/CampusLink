@@ -1,8 +1,8 @@
 # 外部连接方案指南
 
-岚连的外部扩展是声明式 JSON 配置，支持固定 GET/POST 接口的 `http` 方案，以及使用受控适配器的 `drcom` 和 `ruijie` ePortal Web 方案。当前版本不加载任意脚本，也没有运行第三方代码的插件接口。
+岚连的外部扩展是声明式 JSON 配置，支持固定 GET/POST 接口的 `http` 方案，以及使用受控适配器的 `drcom`、`drcom-eportal` 和 `ruijie` 方案。当前版本不加载任意脚本，也没有运行第三方代码的插件接口。
 
-本指南的请求模板、操作定义与响应规则适用于 `http`。Dr.COM 和锐捷方案不配置 `operations`，使用应用固定的认证流程；锐捷请同时阅读 [锐捷校园网方案制作教程](ruijie-guide.md)，按实际认证页配置发现入口、跳转源、公钥和服务。
+本指南的请求模板、操作定义与响应规则适用于 `http`。Dr.COM 和锐捷方案不配置 `operations`，使用应用固定的认证流程；锐捷请同时阅读 [锐捷校园网方案制作教程](ruijie-guide.md)，按实际认证页配置发现入口、跳转源、公钥和服务。景陶的 Dr.COM ePortal 配置见 [景陶接入说明](jdztc-guide.md)，与锐捷的同名 ePortal 产品使用不同协议。
 
 开发者：**NingMeng123** · [GitHub 主页](https://github.com/65658dsf)
 
@@ -19,7 +19,7 @@
 
 在任意方案卡片点击“导出 JSON”，选择保存位置，即可得到 UTF-8 编码的完整声明式配置。Dr.COM 的自动发现设置、HTTP 的登录/注销/状态请求与响应规则、锐捷的发现入口、公钥和服务配置都会保留，导出的文件可在同一应用或另一台安装岚连的设备上导入。
 
-内置贵州轻工职业大学与四川大学方案导出后的 ID 分别为 `gzqy-copy`、`scu-ruijie-copy`，避免占用禁止外部使用的 `builtin-` 前缀。外部方案保留原 ID；同一 ID 已存在时仍会拒绝导入，不会覆盖旧方案。需要保留多个变体时，先修改副本的 `id` 和 `name`。
+内置方案导出时移除 `builtin-` 前缀并添加 `-copy`，例如贵州轻工职业大学为 `gzqy-copy`、四川大学为 `scu-ruijie-copy`、景德镇陶瓷大学为 `jdztc-copy`，避免占用禁止外部使用的 `builtin-` 前缀。外部方案保留原 ID；同一 ID 已存在时仍会拒绝导入，不会覆盖旧方案。需要保留多个变体时，先修改副本的 `id` 和 `name`。
 
 导出读取保存的方案定义，不会把应用设置、当前账号、保存的密码、当前选择的自定义字段值、Cookie、在线会话或运行时发现的地址拼接到文件里。方案本身声明的固定值、默认值、请求模板仍会保留，请不要将个人密码、令牌等直接写在方案定义中。
 
@@ -28,6 +28,8 @@
 可以从贵州轻工职业大学卡片导出 JSON，并根据目标学校已核验的信息修改 `id`、`name`、`homepage` 等声明字段。`protocol` 保持 `drcom` 时，应用继续使用内置适配器的 `/drcom/login`、`/drcom/logout`、`/drcom/chkstatus` 流程和状态复核，不允许通过 JSON 覆写 `operations` 或增加脚本。
 
 可保留 `portalDiscovery` 自动发现当前网络认证入口；`homepage` 是发现失败时的已知回退地址。若声明 `fields` 中的 `operator` 字段，必须提供非空单行字符串默认值或选项，它会作为 `R3` 参数发送；不声明时适配器使用 `1`。不要自行猜测运营商编号、账号后缀或服务值。只适用于协议与现有适配器一致的 Dr.COM Web 部署，其他请求参数、签名或认证流程需要修改并测试主程序适配器。
+
+`drcom-eportal` 是另一条 Dr.COM 登录流程：GET `/eportal/`，使用 `c=Portal`、`a=login` 和 `user_account=,0,原始学号`，密码按原值进行 URL 编码。它沿用 Dr.COM 只读状态查询和注销，并在操作后复核状态；不使用 `/drcom/login`，也不使用锐捷 RSA 配置。当前景陶方案不声明 `fields`，不添加账号后缀、不猜测运营商编号。可以直接从景陶卡片导出，或修改 [景陶示例](../examples/jdztc-campus.example.json)；不要把相似的产品名称当作协议兼容证据，其他学校仍需核验。
 
 ## 完整示例
 
@@ -101,18 +103,18 @@
 | `version` | 是 | 版本字符串，最多 32 字符，例如 `1.0.0` |
 | `author` | 否 | 作者，最多 80 字符 |
 | `homepage` | 是 | 已知认证页 URL，必须使用 HTTP 或 HTTPS；开启网络入口发现时作为回退入口 |
-| `protocol` | 是 | `http`、`drcom` 或 `ruijie`；后两者使用受控适配器 |
+| `protocol` | 是 | `http`、`drcom`、`drcom-eportal` 或 `ruijie`；后三者使用受控适配器 |
 | `timeoutMs` | 否 | 单次请求超时，整数 1000–30000 毫秒；默认 10000 |
 | `fields` | HTTP / Dr.COM 可选 | 界面上的额外输入项，最多 12 项；Dr.COM 若声明 `operator` 须有非空默认值或选项；锐捷必须声明有非空默认值或选项的 `service` 字段 |
-| `operations` | HTTP 必填 | `http` 必须完整提供 `login`、`logout`、`status`；`drcom` / `ruijie` 禁止设置此字段 |
+| `operations` | HTTP 必填 | `http` 必须完整提供 `login`、`logout`、`status`；`drcom` / `drcom-eportal` / `ruijie` 禁止设置此字段 |
 | `ruijie` | 锐捷必填 | 仅 `ruijie` 使用的发现与加密配置，详见 [锐捷教程](ruijie-guide.md) |
-| `portalDiscovery` | 否 | 仅 `drcom` / `ruijie` 支持；形如 `{ "url": "http://www.msftconnecttest.com/redirect" }`，开启只读网络入口发现 |
+| `portalDiscovery` | 否 | 仅 `drcom` / `drcom-eportal` / `ruijie` 支持；形如 `{ "url": "http://www.msftconnecttest.com/redirect" }`，开启只读网络入口发现 |
 
 不接受未声明的额外属性。配置中的 URL 必须为固定字符串，不能包含用户名密码、片段 `#...` 或模板变量。HTTP 方案所有操作的 URL 必须与 `homepage` **同源**，即协议、主机、端口完全相同；不同路径可以使用。认证页在端口 80、接口在端口 801 的通用 HTTP 方案不能以这两个地址直接组合通过校验。
 
-锐捷方案的已知发现入口仍与 `homepage` 同源，发现链的中转来源由 `redirectOrigins` 声明。可选 `portalDiscovery` 则先从当前网络的只读探测响应识别真实门户来源；识别成功后使用该来源进行认证，未识别时回退已知入口。它支持内置及外部 `drcom` / `ruijie`，不支持通用 `http`。
+锐捷方案的已知发现入口仍与 `homepage` 同源，发现链的中转来源由 `redirectOrigins` 声明。可选 `portalDiscovery` 则先从当前网络的只读探测响应识别真实门户来源；识别成功后使用该来源进行认证，未识别时回退已知入口。它支持内置及外部 `drcom` / `drcom-eportal` / `ruijie`，不支持通用 `http`。
 
-两种内置方案与锐捷示例默认使用 `http://www.msftconnecttest.com/redirect`。该地址只是探测入口，正常 MSN/Bing 跳转不是校园网成功信号，账号密码不会被提交给 Microsoft。应用只在运行期间复用已识别的服务器来源，不持久保存发现出的 `queryString`、MAC 或其他临时参数。完整配置与抓包步骤见 [锐捷教程](ruijie-guide.md#3-找到认证服务器与发现入口)。
+内置方案、锐捷示例与景陶示例默认使用 `http://www.msftconnecttest.com/redirect`。该地址只是探测入口，正常 MSN/Bing 跳转不是校园网成功信号，账号密码不会被提交给 Microsoft。应用只在运行期间复用已识别的服务器来源，不持久保存发现出的 `queryString`、MAC 或其他临时参数。完整配置与抓包步骤见 [锐捷教程](ruijie-guide.md#3-找到认证服务器与发现入口)。
 
 ## 自定义字段和变量
 
@@ -196,7 +198,7 @@ JSONP 只允许普通回调函数包装的 JSON，例如 `dr1003({"result":1});`
 - 需要跨源接口、自定义授权头、WebSocket、UDP 或 PPPoE 拨号的协议。
 - 需要启动外部程序、执行系统命令或运行 JavaScript 的连接方法。
 
-外部 `drcom` 方案可以复用受控适配器、另存配置副本，但不能替换内置方案或覆写适配器实现。若学校修改了协议，应参照 [认证协议核验](portal-protocol.md) 更新适配器，并使用模拟服务覆盖变更。
+外部 `drcom` / `drcom-eportal` 方案可以复用相应受控适配器、另存配置副本，但不能替换内置方案或覆写适配器实现。若学校修改了协议，应参照 [认证协议核验](portal-protocol.md) 与 [景陶接入说明](jdztc-guide.md) 更新适配器，并使用模拟服务覆盖变更。
 
 ## 本地校验和调试
 

@@ -54,6 +54,16 @@ test('request JSON, form body and sensitive headers supply redaction secrets', (
   assert.equal(diagnostic.responseBody, '[已隐藏] [已隐藏] [已隐藏] [已隐藏] [已隐藏] [已隐藏]');
 });
 
+test('Dr.COM ePortal account, password and device fields are redacted from server echoes', () => {
+  const url = new URL('http://portal.invalid/eportal/?c=Portal&a=login');
+  url.searchParams.set('user_account', ',0,student-private');
+  url.searchParams.set('user_password', 'password-private');
+  url.searchParams.set('wlan_user_mac', 'aabbccddeeff');
+  const detail = createDiagnostic(url, {}, { responseBody: ',0,student-private password-private aabbccddeeff' });
+  assert.equal(detail.responseBody, '[已隐藏] [已隐藏] [已隐藏]');
+  assert.equal(sanitizeText('{"user_account":"server-account","wlan_user_mac":"112233445566"}'), '{"user_account":[已隐藏],"wlan_user_mac":[已隐藏]}');
+});
+
 test('server-issued secrets are hidden even when not present in the request', () => {
   const response = '{"password":"server-pass","user_name":"server-user","access_token":"server-token"}\nAuthorization: Bearer arbitrary-value\nSet-Cookie: session=arbitrary-cookie; Path=/\n<input value="input-secret" name="upass"><script>token = "script-secret";</script>';
   const result = sanitizeText(response);

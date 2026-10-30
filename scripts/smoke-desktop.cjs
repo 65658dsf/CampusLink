@@ -53,7 +53,7 @@ const http = require('node:http');
     const fresh = await welcomePage.evaluate(() => window.campus.getSnapshot());
     assert.equal(fresh.app.firstRun, true);
     assert.equal(fresh.settings.profileId, '');
-    assert.equal(fresh.profiles.length, 3);
+    assert.equal(fresh.profiles.length, 4);
     assert.equal(fresh.connection.status, 'idle');
     assert.deepEqual(fresh.settings.parameters, {});
     assert.equal(fresh.logs.some(log => log.message.includes('状态查询')), false);
@@ -61,8 +61,13 @@ const http = require('node:http');
     await expect(welcomePage.locator('.profile-card.selected')).toHaveCount(0);
     await expect(welcomePage.getByRole('heading', { name: '贵州轻工职业大学', exact: true })).toBeVisible();
     await expect(welcomePage.getByRole('heading', { name: '四川大学 · 锐捷 ePortal', exact: true })).toBeVisible();
+    await expect(welcomePage.getByRole('heading', { name: '景德镇陶瓷大学 · Dr.COM ePortal', exact: true })).toBeVisible();
     await expect(welcomePage.getByRole('button', { name: '打开贵州轻工职业大学认证页', exact: true })).toBeDisabled();
     const search = welcomePage.getByRole('searchbox', { name: '搜索连接方案' });
+    await search.fill('景德镇');
+    await expect(welcomePage.locator('.profile-card')).toHaveCount(1);
+    await expect(welcomePage.getByRole('heading', { name: '景德镇陶瓷大学 · Dr.COM ePortal', exact: true })).toBeVisible();
+    await expect(welcomePage.locator('.profile-card')).toContainText('Dr.COM ePortal 认证');
     await search.fill('  四川  ');
     await expect(welcomePage.locator('.profile-card')).toHaveCount(1);
     await expect(welcomePage.locator('#profile-search-results')).toContainText('找到 1 个匹配方案');
@@ -154,7 +159,7 @@ const http = require('node:http');
     await page.getByRole('button', { name: '关闭提示' }).click();
     await page.getByRole('button', { name: '开发日志', exact: true }).click();
     await expect(page.getByRole('heading', { name: '版本记录' })).toBeVisible();
-    await expect(page.locator('.journal-entry').first()).toContainText('v1.1.2');
+    await expect(page.locator('.journal-entry').first()).toContainText(`v${require('../package.json').version}`);
     await expect(page.getByText('NingMeng123', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '打开项目仓库', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '连接概览', exact: true }).click();
@@ -176,13 +181,19 @@ const http = require('node:http');
     assert.deepEqual(JSON.parse(fs.readFileSync(exportPath, 'utf8')), JSON.parse(fs.readFileSync(path.join(root, 'examples/ruijie-campus.example.json'), 'utf8')));
     // Per-card exports must be actual, re-importable definitions, not examples
     // or public snapshots that omit protocol configuration.
-    for (const [name, protocol] of [['四川大学 · 锐捷 ePortal', 'ruijie'], ['贵州轻工职业大学', 'drcom']]) {
+    for (const [name, protocol] of [['四川大学 · 锐捷 ePortal', 'ruijie'], ['景德镇陶瓷大学 · Dr.COM ePortal', 'drcom-eportal'], ['贵州轻工职业大学', 'drcom']]) {
       await page.getByRole('button', { name: `导出${name}方案 JSON`, exact: true }).click();
       await expect.poll(() => JSON.parse(fs.readFileSync(exportPath, 'utf8')).protocol).toBe(protocol);
       const exported = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
       assert.equal(exported.id.startsWith('builtin-'), false);
       assert.deepEqual(require('../electron/profiles.cjs').parseProfile(JSON.stringify(exported)), exported);
       if (protocol === 'ruijie') assert.ok(exported.ruijie.publicKey.modulus);
+      if (protocol === 'drcom-eportal') {
+        await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, exportPath);
+        await page.getByRole('button', { name: '导入连接方案', exact: true }).click();
+        await expect.poll(async () => (await page.evaluate(() => window.campus.getSnapshot())).profiles.some(p => p.id === 'jdztc-copy')).toBe(true);
+        await page.evaluate(() => window.campus.removeProfile('jdztc-copy'));
+      }
     }
     await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, exportPath);
     await page.getByRole('button', { name: '导入连接方案', exact: true }).click();

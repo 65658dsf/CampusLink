@@ -13,6 +13,15 @@ export const projectIntro = '岚连 Campus Link 是面向 Windows / macOS 的校
 
 export const journalEntries: JournalEntry[] = [
   {
+    version: '1.1.3', date: '2026-10-30', title: '景陶校园网接入与安装修复',
+    items: [
+      '新增景德镇陶瓷大学 Dr.COM ePortal 方案，动态读取入口参数，使用原始学号认证。',
+      '补齐新方案的搜索、JSON 导入导出、诊断脱敏与认证结果复核。',
+      '景陶状态和注销使用 Dr.COM 兼容流程，当前仍需校内实网验证。',
+      '修复 Windows 自定义安装目录，自动补上 Campus Link 文件夹且不重复添加。',
+    ],
+  },
+  {
     version: '1.1.2', date: '2026-10-16', title: '方案选择与连接体验',
     items: [
       '首次启动不预选学校，引导前往连接方案选择匹配的认证配置。',

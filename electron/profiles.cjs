@@ -113,10 +113,10 @@ function validateProfile(value, { builtin = false } = {}) {
   string(value.version, '版本', 32);
   string(value.author, '作者', 80, true);
   const homepage = safeUrl(value.homepage, '认证页地址');
-  if (!['drcom', 'http', 'ruijie'].includes(value.protocol)) fail('protocol 仅支持 drcom / http / ruijie');
+  if (!['drcom', 'http', 'ruijie', 'drcom-eportal'].includes(value.protocol)) fail('protocol 仅支持 drcom / http / ruijie / drcom-eportal');
   if (value.protocol !== 'ruijie' && Object.hasOwn(value, 'ruijie')) fail('仅锐捷方案可声明 ruijie 配置');
   if (Object.hasOwn(value, 'portalDiscovery')) {
-    if (!['drcom', 'ruijie'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie 方案');
+    if (!['drcom', 'ruijie', 'drcom-eportal'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie / drcom-eportal 方案');
     keys(value.portalDiscovery, ['url'], '认证页自动发现');
     safeUrl(value.portalDiscovery.url, '认证页发现地址');
   }
@@ -147,7 +147,7 @@ function validateProfile(value, { builtin = false } = {}) {
     keys(value.operations, ['login', 'logout', 'status'], 'operations');
     for (const name of ['login', 'logout', 'status']) if (!value.operations[name]) fail(`缺少 ${name} 请求；v1 方案须完整提供登录、注销与只读状态查询`);
     for (const name of Object.keys(value.operations)) validateOperation(value.operations[name], name, homepage.origin, variables);
-  } else if (Object.hasOwn(value, 'operations')) fail('drcom / ruijie 方案不允许覆写 operations 请求');
+  } else if (Object.hasOwn(value, 'operations')) fail('drcom / ruijie / drcom-eportal 方案不允许覆写 operations 请求');
   if (value.protocol === 'drcom') {
     const operator = value.fields?.find(field => field.key === 'operator');
     if (operator) {
@@ -269,5 +269,15 @@ const builtinCdutYibinProfile = validateProfile({
   },
 }, { builtin: true });
 
-const builtinProfiles = [builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile];
-module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, exportProfile, exportProfileJson, profileParameters, safeUrl, keys };
+const builtinJdztcProfile = validateProfile({
+  schemaVersion: 1,
+  id: 'builtin-jdztc',
+  name: '景德镇陶瓷大学 · Dr.COM ePortal',
+  description: '参考景德镇陶瓷大学校园网脚本的 Dr.COM ePortal 请求实现；请先连接 JCU、JCI 等校园网络，填写原始学号，不追加运营商后缀。当前接入仍需校内验证。',
+  version: '1.0.0', author: 'NingMeng123', homepage: 'http://172.29.0.2/a79.htm',
+  protocol: 'drcom-eportal', timeoutMs: 10000,
+  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
+}, { builtin: true });
+
+const builtinProfiles = [builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinJdztcProfile];
+module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinJdztcProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, exportProfile, exportProfileJson, profileParameters, safeUrl, keys };

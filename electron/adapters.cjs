@@ -3,6 +3,7 @@
 const { request, parseJsonOrJsonp, CampusError } = require('./transport.cjs');
 const { createDiagnostic, sanitizeText } = require('./diagnostics.cjs');
 const { ruijieOperation } = require('./ruijie.cjs');
+const { drcomEportalOperation } = require('./drcom-eportal.cjs');
 const { portalRequest } = require('./portal-transport.cjs');
 const { discoverPortal } = require('./portal-discovery.cjs');
 
@@ -21,6 +22,11 @@ async function resolvePortalProfile(profile, requester) {
   if (!endpoint) return profile;
   return {
     ...profile, homepage: endpoint.homepage,
+    ...(profile.protocol === 'drcom-eportal' ? {
+      // Keep the configured landing path, but never cache a device query.
+      homepage: new URL(new URL(profile.homepage).pathname, endpoint.homepage).href,
+      ...(found ? { discoveredEntry: found.entryUrl } : {}),
+    } : {}),
     ...(profile.protocol === 'ruijie' ? {
       ruijie: { ...profile.ruijie, discoveryUrl: endpoint.homepage, redirectOrigins: [...new Set([...(profile.ruijie.redirectOrigins || []), ...endpoint.redirectOrigins])] },
       ...(found ? { discoveredEntry: found.entryUrl } : {}),
@@ -146,7 +152,7 @@ async function runOperation(profile, operation, context = {}, requester) {
     let captured = false;
     const observedOptions = { ...options, diagnosticSecrets: secrets, onDiagnostic: detail => { captured = true; diagnostics.push(detail); } };
     try {
-      const transport = requester || (profile.protocol === 'ruijie' || options.allowRedirect ? portalRequest : request);
+      const transport = requester || (['ruijie', 'drcom-eportal'].includes(profile.protocol) || options.allowRedirect ? portalRequest : request);
       const text = await transport(url, observedOptions, timeout);
       // Custom/mock transports can keep returning text; still provide useful context.
       if (!captured) diagnostics.push(createDiagnostic(url, observedOptions, { responseBody: text, durationMs: Date.now() - started }));
@@ -158,7 +164,7 @@ async function runOperation(profile, operation, context = {}, requester) {
   };
   try {
     const effectiveProfile = await resolvePortalProfile(profile, observedRequest);
-    const adapter = profile.protocol === 'drcom' ? drcomOperation : profile.protocol === 'ruijie' ? ruijieOperation : genericOperation;
+    const adapter = profile.protocol === 'drcom' ? drcomOperation : profile.protocol === 'ruijie' ? ruijieOperation : profile.protocol === 'drcom-eportal' ? drcomEportalOperation : genericOperation;
     const result = await adapter(effectiveProfile, operation, context, observedRequest, value => { if (!secrets.includes(value)) secrets.push(value); });
     return { ...result, portalUrl: new URL(effectiveProfile.homepage).origin + '/' };
   } catch (error) {

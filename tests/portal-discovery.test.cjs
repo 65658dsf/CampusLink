@@ -99,10 +99,42 @@ test('a recognized different protocol raises a mismatch, not fallback', async ()
   for (const [selected, location, body] of [
     ['ruijie', 'http://10.8.6.25/', DRCOM],
     ['drcom', 'http://10.8.6.25/eportal/index.jsp?mac=aabbccddeeff', '<html>ePortal</html>'],
+    ['drcom-eportal', 'http://10.8.6.25/eportal/index.jsp?mac=aabbccddeeff', '<html>ePortal</html>'],
+    ['drcom', 'http://10.8.6.25/a79.htm', '<html><!--Dr.COMWebLoginID_0.htm--></html>'],
   ]) {
     const f = fixture({ [PROBE]: { status: 302, location }, [location]: { body } });
     await assert.rejects(discoverPortal(profile(selected), f.requester), { code: 'PORTAL_PROTOCOL_MISMATCH' });
     assert.equal(f.requests.length, 2);
+  }
+});
+
+test('JCU a79 and its JSONP login reference identify Dr.COM ePortal without executing scripts', async () => {
+  const body = '<html><form><input name="DDDDD"><input name="upass"></form><script>const api="/eportal/?c=Portal&a=login";globalThis.portalExecuted=true;</script></html>';
+  for (const [path, html] of [
+    ['/a79.htm?userip=172.20.1.2&wlanacip=172.20.0.1', '<html><!--Dr.COMWebLoginID_0.htm--></html>'],
+    ['/portal/', body],
+    ['/portal/', DRCOM],
+    ['/a79.htm', `${DRCOM}<script>function logout(){location.href="/F.htm";}function login(){location.href="/drcom/login";}</script>`],
+  ]) {
+    const entry = `http://10.8.6.40${path}`;
+    const f = fixture({ [PROBE]: { status: 302, location: entry }, [entry]: { body: html } });
+    const found = await discoverPortal(profile('drcom-eportal'), f.requester);
+    assert.equal(found.homepage, 'http://10.8.6.40/');
+    assert.equal(found.entryUrl, entry);
+    assert.equal(f.requests.length, 2);
+  }
+  assert.equal(globalThis.portalExecuted, undefined);
+});
+
+test('discovery never follows ePortal credential URLs or read-write GET actions', async () => {
+  for (const path of [
+    '/?user_account=private', '/?user_password=private',
+    '/eportal/?c=Portal&a=login', '/eportal/?c=Portal&a=logout',
+    '/drcom/login', '/drcom/logout', '/F.htm',
+  ]) {
+    const f = fixture({ [PROBE]: { status: 302, location: `http://10.8.6.41${path}` } });
+    assert.equal(await discoverPortal(profile('drcom-eportal'), f.requester), null);
+    assert.equal(f.requests.length, 1);
   }
 });
 

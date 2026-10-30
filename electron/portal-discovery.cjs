@@ -8,18 +8,22 @@ const { htmlTarget } = require('./ruijie.cjs');
 
 const MAX_HOPS = 6;
 const MICROSOFT_DOMAINS = ['msftconnecttest.com', 'msftncsi.com', 'microsoft.com', 'microsoft.cn', 'microsoftonline.com', 'msn.com', 'msn.cn', 'bing.com', 'bing.com.cn', 'live.com', 'windows.com'];
-const CREDENTIAL_KEY = /^(?:username|user|userid|account|accountname|accountid|loginname|ddddd|upass|pwd|pass|password|passwd|operatorpwd|operatoruserid|authorization|cookie|credential|credentials|secret|token|accesstoken|refreshtoken|apikey)$/i;
+const CREDENTIAL_KEY = /^(?:username|user|userid|useraccount|userpassword|account|accountname|accountid|loginname|ddddd|upass|pwd|pass|password|passwd|operatorpwd|operatoruserid|authorization|cookie|credential|credentials|secret|token|accesstoken|refreshtoken|apikey)$/i;
 
 function isMicrosoft(url) {
   const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
   return MICROSOFT_DOMAINS.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
 }
 
-function safeTarget(value, base) {
+function safeTarget(value, base, { formOriginOnly = false } = {}) {
   if (typeof value !== 'string' || value.length > 20000 || /[\u0000-\u0020]/.test(value)) return null;
   let url;
   try { url = new URL(value, base); } catch { return null; }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) return null;
+  // Some Dr.COM actions use GET. Discovery must never execute them, even
+  // when the redirect carries no account or password.
+  if (!formOriginOnly && (/^\/(?:drcom\/(?:login|logout)|F\.htm)\/?$/i.test(url.pathname) ||
+      (/^\/eportal\/?$/i.test(url.pathname) && /^(?:login|logout)$/i.test(url.searchParams.get('a') || '')))) return null;
   // Discovery never sends account credentials, even if a redirect contains
   // them. Do not silently turn an authenticated URL into an apparent probe.
   for (const [key] of url.searchParams) if (CREDENTIAL_KEY.test(key.replace(/[^a-z0-9]/gi, ''))) return null;
@@ -33,6 +37,10 @@ function protocolOf(url, body) {
   const loginForm = /<form\b[^>]*>[\s\S]*?<input\b[^>]*(?:name|id)\s*=\s*["']?(?:DDDDD|upass|username|password|userId|account)\b/i.test(html);
   const drcomApi = /(?:["'\s=]|^)\/?drcom\/(?:login|logout|chkstatus|rad_user_info)\b/i.test(body) || /https?:\/\/[^\s"'<>]+\/drcom\/(?:login|logout|chkstatus|rad_user_info)\b/i.test(body);
   const drcom = drcomMarker || (loginForm && drcomApi);
+  // JCU's a79 landing page uses the older Dr.COM ePortal JSONP login,
+  // which is distinct from both /drcom/login and Ruijie's JSP ePortal.
+  const eportalApi = /\/eportal\/\?[^"'<>\s]*\bc=Portal(?:&(?:amp;)?|%26)a=login\b/i.test(body);
+  const drcomEportal = htmlDocument && (drcomMarker || loginForm) && (/^\/a79\.htm$/i.test(url.pathname) || eportalApi);
   const eportalPath = /^\/eportal\/(?:index|success|redirectortosuccess)\.jsp$/i.test(url.pathname);
   const mac = url.searchParams.get('mac') || '';
   // SCU calls its 32-digit opaque device identifier "mac" as well. Preserve
@@ -40,8 +48,8 @@ function protocolOf(url, body) {
   const validMac = /^(?:[a-f0-9]{12}|[a-f0-9]{32}|(?:[a-f0-9]{2}[:-]){5}[a-f0-9]{2})$/i.test(mac) && url.search.length <= 16385;
   const eportalMarker = /(?:\bePortal\b|\bRuijie\b|锐捷|\bInterFace\.do\b)/i.test(body);
   const ruijie = eportalPath && (validMac || eportalMarker);
-  if (drcom && ruijie) return 'ambiguous';
-  return drcom ? 'drcom' : ruijie ? 'ruijie' : null;
+  if ((drcom || drcomEportal) && ruijie) return 'ambiguous';
+  return drcomEportal ? 'drcom-eportal' : drcom ? 'drcom' : ruijie ? 'ruijie' : null;
 }
 
 function explicitFormOrigin(body, current) {
@@ -52,7 +60,7 @@ function explicitFormOrigin(body, current) {
   for (const form of String(body).matchAll(/<form\b[^<>]*>/gi)) {
     const action = form[0].match(/\baction\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
     if (!action) continue;
-    const url = safeTarget((action[1] ?? action[2] ?? action[3]).replace(/&amp;/gi, '&'), current);
+    const url = safeTarget((action[1] ?? action[2] ?? action[3]).replace(/&amp;/gi, '&'), current, { formOriginOnly: true });
     if (!url || isMicrosoft(url)) continue;
     // Visit the server's landing page with GET; never execute a form's login,
     // logout, or other action while discovering its origin.
@@ -62,7 +70,7 @@ function explicitFormOrigin(body, current) {
 }
 
 async function discoverPortal(profile, requester = portalRequest) {
-  if (!profile?.portalDiscovery?.url || !['drcom', 'ruijie'].includes(profile.protocol)) return null;
+  if (!profile?.portalDiscovery?.url || !['drcom', 'ruijie', 'drcom-eportal'].includes(profile.protocol)) return null;
   let current = safeTarget(profile.portalDiscovery.url);
   if (!current) return null;
   const visited = new Set();
@@ -85,7 +93,11 @@ async function discoverPortal(profile, requester = portalRequest) {
         continue;
       }
       if (response.status < 200 || response.status >= 300) return null;
-      const target = htmlTarget(String(body));
+      // Dr.COM documents can define login/logout helpers containing location
+      // literals. An identified page is not a redirect shell: following those
+      // helper bodies would turn discovery into a login or logout action.
+      const knownDrcomPage = profile.protocol === 'drcom-eportal' && ['drcom', 'drcom-eportal'].includes(protocolOf(current, body));
+      const target = knownDrcomPage ? null : htmlTarget(String(body));
       if (target) {
         const next = safeTarget(target, current);
         if (!next) return null;
@@ -93,7 +105,7 @@ async function discoverPortal(profile, requester = portalRequest) {
         continue;
       }
       if (isMicrosoft(current)) {
-        const portalBody = protocolOf(current, body) === 'drcom' || /<(?:html|form)\b/i.test(body) && /(?:\bePortal\b|\bRuijie\b|锐捷|\bInterFace\.do\b)/i.test(body);
+        const portalBody = ['drcom', 'drcom-eportal'].includes(protocolOf(current, body)) || /<(?:html|form)\b/i.test(body) && /(?:\bePortal\b|\bRuijie\b|锐捷|\bInterFace\.do\b)/i.test(body);
         if (!portalBody) return null;
         const target = explicitFormOrigin(body, current);
         if (!target) return null;
@@ -102,7 +114,9 @@ async function discoverPortal(profile, requester = portalRequest) {
       }
       const detected = protocolOf(current, body);
       if (!detected || detected === 'ambiguous') return null;
-      if (detected !== profile.protocol) throw new CampusError('当前网络的校园网认证类型与所选方案不同，请切换匹配的连接方案后重试。', 'PORTAL_PROTOCOL_MISMATCH');
+      // Legacy comment markers alone identify only the Dr.COM family.
+      const compatibleDrcom = detected === 'drcom' && profile.protocol === 'drcom-eportal';
+      if (detected !== profile.protocol && !compatibleDrcom) throw new CampusError('当前网络的校园网认证类型与所选方案不同，请切换匹配的连接方案后重试。', 'PORTAL_PROTOCOL_MISMATCH');
       return { homepage: `${current.origin}/`, entryUrl: current.href, redirectOrigins: [...origins] };
     }
   } catch (error) {

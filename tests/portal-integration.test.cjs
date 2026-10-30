@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { runOperation } = require('../electron/adapters.cjs');
-const { builtinProfile, builtinRuijieProfile } = require('../electron/profiles.cjs');
+const { builtinProfile, builtinRuijieProfile, builtinJdztcProfile } = require('../electron/profiles.cjs');
 
 async function server(t, handler) {
   const instance = http.createServer(handler);
@@ -74,4 +74,59 @@ test('a discovered protocol mismatch blocks login instead of falling back to an 
   const profile = { ...builtinProfile, homepage: 'http://must-not-contact.example.invalid/', portalDiscovery: { url: `${probe}/redirect` } };
   await assert.rejects(runOperation(profile, 'login', { username: 'local-user', password: 'local-password' }), { code: 'PORTAL_PROTOCOL_MISMATCH' });
   assert.equal(posts, 0);
+});
+
+test('JCU discovers a changed gateway, authenticates with current device parameters and verifies logout', async t => {
+  const calls = [];
+  const gateways = [];
+  const makeGateway = async name => {
+    let online = false;
+    const origin = await server(t, (req, res) => {
+      const url = new URL(req.url, 'http://local.invalid');
+      calls.push({ name, method: req.method, url: req.url, headers: req.headers });
+      if (url.pathname === '/eportal/') {
+        assert.equal(url.searchParams.get('c'), 'Portal');
+        assert.equal(url.searchParams.get('a'), 'login');
+        assert.equal(url.searchParams.get('user_account'), ',0,local-student');
+        assert.equal(url.searchParams.get('user_password'), 'local pass&+密');
+        assert.equal(url.searchParams.get('wlan_user_ip'), name === 'first' ? '172.20.1.2' : '172.20.1.3');
+        assert.equal(url.searchParams.get('wlan_ac_ip'), '172.20.0.1');
+        assert.equal(url.searchParams.get('wlan_ac_name'), 'Local AC');
+        online = true; res.end('dr1003({"result":"ok"})');
+      } else if (url.pathname === '/drcom/logout') {
+        online = false; res.end('dr1003({"result":1})');
+      } else if (url.pathname === '/drcom/chkstatus') {
+        res.end(`dr1003(${JSON.stringify({ result: online ? 1 : 0, v46ip: '172.20.1.2' })})`);
+      } else if (url.pathname === '/a79.htm') {
+        res.end(`<html><!--Dr.COMWebLoginID_${online ? 1 : 0}.htm--><form><input name="DDDDD"><input name="upass"></form></html>`);
+      } else { res.statusCode = 404; res.end('unknown'); }
+    });
+    gateways.push(origin);
+    return origin;
+  };
+  const first = await makeGateway('first'), second = await makeGateway('second');
+  const entry = (origin, ip) => `${origin}/a79.htm?userip=${ip}&wlanacip=172.20.0.1&wlanacname=Local%20AC`;
+  let target = entry(first, '172.20.1.2');
+  const probe = await server(t, (req, res) => {
+    calls.push({ name: 'probe', method: req.method, url: req.url, headers: req.headers });
+    res.writeHead(302, { Location: target, 'Set-Cookie': 'probe-session=never-copy' }); res.end();
+  });
+  const profile = { ...builtinJdztcProfile, id: `jcu-discovery-${new URL(probe).port}`, homepage: 'http://must-not-contact.example.invalid/a79.htm', portalDiscovery: { url: `${probe}/redirect` } };
+  const credentials = { username: 'local-student', password: 'local pass&+密', parameters: {} };
+  assert.equal((await runOperation(profile, 'login', credentials)).portalUrl, `${first}/`);
+  target = 'https://www.msn.com/';
+  const count = calls.length;
+  assert.equal((await runOperation(profile, 'status')).online, true);
+  assert.deepEqual(calls.slice(count).map(call => call.name), ['probe', 'first']);
+  assert.equal(new URL(calls.at(-1).url, first).pathname, '/drcom/chkstatus');
+  assert.equal((await runOperation(profile, 'logout')).online, false);
+  target = entry(second, '172.20.1.3');
+  assert.equal((await runOperation(profile, 'login', credentials)).portalUrl, `${second}/`);
+  assert.deepEqual(profile.homepage, 'http://must-not-contact.example.invalid/a79.htm', 'discovery does not mutate the stored profile');
+  assert.equal(Object.hasOwn(profile, 'discoveredEntry'), false);
+  assert.ok(calls.every(call => call.method === 'GET'));
+  assert.ok(calls.every(call => !call.headers.cookie && !call.headers.authorization));
+  const probes = calls.filter(call => call.name === 'probe');
+  assert.ok(probes.every(call => call.url === '/redirect'));
+  assert.deepEqual(calls.filter(call => call.url.startsWith('/eportal/')).map(call => call.name), ['first', 'second']);
 });

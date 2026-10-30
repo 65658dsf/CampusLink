@@ -15,7 +15,7 @@ const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
 ];
 const statusLabels = { idle: '等待连接', checking: '正在检测', connecting: '正在连接', connected: '已登录校园网', disconnecting: '正在注销', error: '连接需要处理' };
 const levelLabels = { info: '信息', success: '成功', warning: '提醒', error: '错误' };
-const protocolLabels: Record<string, string> = { drcom: 'Dr.COM 认证', http: 'HTTP 认证', ruijie: '锐捷 ePortal 认证' };
+const protocolLabels: Record<string, string> = { drcom: 'Dr.COM 认证', http: 'HTTP 认证', ruijie: '锐捷 ePortal 认证', 'drcom-eportal': 'Dr.COM ePortal 认证' };
 const protocolLabel = (protocol?: string) => protocolLabels[protocol ?? ''] ?? protocol ?? '未知协议';
 const portalOrigin = (value?: string) => {
   try { const url = new URL(value ?? ''); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.origin : ''; }

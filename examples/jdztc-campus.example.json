@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "jdztc-campus",
+  "name": "景德镇陶瓷大学 · Dr.COM ePortal",
+  "description": "参考景德镇陶瓷大学校园网脚本的 Dr.COM ePortal 请求实现；请先连接 JCU、JCI 等校园网络，填写原始学号，不追加运营商后缀。当前接入仍需校内验证。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "http://172.29.0.2/a79.htm",
+  "protocol": "drcom-eportal",
+  "timeoutMs": 10000,
+  "portalDiscovery": {
+    "url": "http://www.msftconnecttest.com/redirect"
+  }
+}
