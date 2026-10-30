@@ -66,7 +66,7 @@
 
 内置“景德镇陶瓷大学 · Dr.COM ePortal”可直接选择；[jdztc-campus.example.json](jdztc-campus.example.json) 是同参数的外部副本，ID 为 `jdztc-campus`。也可通过内置卡片“导出 JSON”生成 ID 为 `jdztc-copy` 的副本。
 
-先手动连接 JCU / JCI，再输入原始学号和密码，不追加运营商后缀。已知入口为 `http://172.29.0.2/a79.htm`。登录使用 `/eportal/?c=Portal&a=login`，账号字段为 `user_account=,0,原始学号`；只读状态和注销当前沿用 `/drcom/chkstatus`、`/drcom/logout`，并在操作后复核。未知响应、超时或 HTTP 错误不当作离线。上游没有提供景陶状态及注销接口证据，这些行为仍需校内验证。
+当前适配仅实现参考脚本的原始学号路径，使用前先手动连接 JCU / JCI；实际门户有运营商下拉框，其选项值与账号后缀映射尚待成功请求抓包核验，尚不宣称支持所有运营商。已知入口为 `http://172.29.0.2/a79.htm`。登录使用 `/eportal/?c=Portal&a=login`，账号字段为 `user_account=,0,原始学号`；只读状态和注销当前沿用 `/drcom/chkstatus`、`/drcom/logout`，并在操作后复核。未知响应、超时或 HTTP 错误不当作离线。上游没有提供景陶状态及注销接口证据，这些行为仍需校内验证。
 
 该协议为 `drcom-eportal`，与锐捷 `ruijie` ePortal Web 不同；上游 README 的“深澜”描述与实际登录脚本不一致。岚连仅参考公开认证地址和协议事实独立实现，没有复制上游源码。完整来源、许可说明及验证范围见 [景陶接入说明](../docs/jdztc-guide.md)。
 
