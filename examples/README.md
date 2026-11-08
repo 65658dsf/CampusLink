@@ -79,3 +79,11 @@ Windows 配置存放在 Electron `app.getPath('userData')` 对应的 `settings.j
 开机自启动只在 Windows 打包版中注册当前应用，不会在开发模式下注册 Electron 开发工具。自启动与启动后自动认证是两个独立开关；自动认证必须主动开启并已保存密码，启动时会先检查状态，已在线则跳过认证，状态查询失败也不盲目提交密码。关闭应用不会自动注销校园网；如需退出认证，请先点「断开」。
 
 开发者：[NingMeng123](https://github.com/65658dsf)。
+
+## 通用识别与新增高校
+
+- [drcom-auto.example.json](drcom-auto.example.json)：Dr.COM 自动识别，端口/前缀默认自动，支持填写认证页。见[范围说明](../docs/drcom-auto-guide.md)。
+- [cqu-campus.example.json](cqu-campus.example.json)：重庆大学电脑端，保留完整账号。
+- [ruijie-swu.example.json](ruijie-swu.example.json)：西南大学默认服务与动态公钥。
+
+高校方案均为 NingMeng123 独立集成，已做源码对照与本地模拟测试，校内真实登录、状态、注销仍待验收。见[接入记录](../docs/university-adapters.md)。

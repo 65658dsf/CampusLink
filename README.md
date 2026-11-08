@@ -23,7 +23,7 @@
 
 | | 能做什么 |
 | --- | --- |
-| 🔌 轻松认证 | 支持 Dr.COM Web / ePortal、锐捷 ePortal Web 和声明式 HTTP 方案；内置方案自动发现认证入口 |
+| 🔌 轻松认证 | 支持 Dr.COM 自动识别、Web / ePortal、锐捷 ePortal Web 和声明式 HTTP 方案 |
 | 🛡️ 网络守护 | 检测状态、断线重连、网络变化快速检查，托盘一键暂停或恢复 |
 | 🧩 灵活配置 | 搜索学校方案，导入 / 导出 JSON，扩展更多校园网络 |
 | 🔐 本地凭据 | 记住的密码通过系统加密保存，也支持仅在本次连接中使用 |
@@ -40,13 +40,13 @@
 2. **选择学校方案**：先连接校园 Wi-Fi 或网线，再到“连接方案”搜索学校。首次打开不会预选方案。
 3. **填写账号并连接**：已认证时会直接展示在线状态；需要认证时输入账号密码，按需开启记住密码和自动连接。
 
-内置 **贵州轻工职业大学（Dr.COM）**、**四川大学**、**成都理工大学（宜宾校区）**、**景德镇陶瓷大学（Dr.COM ePortal）** 方案；其他学校可[制作并导入 JSON](docs/plugin-guide.md)。景德镇陶瓷大学已按实际请求修正为 801 端口新版接口，并按网页选项补齐电信、移动、联通和“测试”的账号后缀；“其他”可填写完整账号。目前已核对登录请求与失败响应，成功登录及状态、注销仍需校内验收，详见[接入说明](docs/jdztc-guide.md)。锐捷支持范围为 ePortal 网页认证。
+内置 **28 所高校连接方案**，覆盖 Dr.COM、锐捷 ePortal、深澜 Srun 与深信服 Portal，另有 Dr.COM 自动识别通用方案。贵州已有贵州轻工职业大学，新增贵州师范大学深信服方案和贵州民族大学 Dr.COM 自动识别方案。新增方案已完成源码对照与本地模拟验证，校内真实登录、状态和注销仍待验收。贵州民族大学的当前入口与请求参数由校园页面识别，完整清单和固定源码链接见接入记录。[高校接入记录](docs/university-adapters.md) · [Dr.COM 自动识别](docs/drcom-auto-guide.md) · [制作并导入 JSON](docs/plugin-guide.md)
 
 > macOS 将应用拖入“应用程序”后运行。当前安装包未签名，macOS 也未公证，系统可能提示拦截；详见[安装说明](docs/usage.md#安装和首次连接)。
 
 ## 📚 想了解更多
 
-[完整使用指南](docs/usage.md) · [方案制作](docs/plugin-guide.md) · [锐捷教程](docs/ruijie-guide.md) · [景陶接入](docs/jdztc-guide.md) · [版本更新](docs/releases-v1.1.4.md) · [构建与发布](docs/releases.md)
+[完整使用指南](docs/usage.md) · [Dr.COM 自动识别](docs/drcom-auto-guide.md) · [方案制作](docs/plugin-guide.md) · [锐捷教程](docs/ruijie-guide.md) · [景陶接入](docs/jdztc-guide.md) · [版本更新](docs/releases-v1.1.5.md) · [构建与发布](docs/releases.md)
 
 连接失败时先查看应用内日志，也可携带脱敏诊断信息提交 [Issue](https://github.com/65658dsf/CampusLink/issues)。学校账号、欠费或设备上限问题请联系校园网服务渠道。
 

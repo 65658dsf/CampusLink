@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "cqu-campus",
+  "name": "重庆大学 · Dr.COM ePortal",
+  "description": "重庆大学 CQU 电脑端校园网认证；使用学校完整账号，不自动添加运营商后缀。已对照 GitHub 源码并通过本地模拟验证，登录、状态及普通注销仍待校内实测。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "http://login.cqu.edu.cn/",
+  "protocol": "drcom-eportal",
+  "timeoutMs": 10000,
+  "drcomEportal": {
+    "variant": "portal-v4",
+    "apiPort": 801,
+    "dialect": "cqu"
+  },
+  "portalDiscovery": {
+    "url": "http://www.msftconnecttest.com/redirect"
+  },
+  "fields": []
+}

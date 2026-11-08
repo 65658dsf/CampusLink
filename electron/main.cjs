@@ -74,7 +74,7 @@ function registerIpc() {
     const text = fs.readFileSync(file, 'utf8');
     const profile = parseProfile(text);
     const discovery = profile.portalDiscovery
-      ? `自动发现入口：${profile.portalDiscovery.url}\n应用将探测当前网络的真实认证服务器，并仅向识别出且协议匹配的认证服务器提交账号和密码。\n备用认证页：${profile.homepage}\n\n`
+      ? `自动发现入口：${profile.portalDiscovery.url}\n应用将探测当前网络的真实认证服务器，并仅向识别出且协议匹配的认证服务器提交账号和密码。\n${profile.protocol === 'drcom-auto' ? '认证页也可在连接时手动填写。' : `备用认证页：${profile.homepage}`}\n\n`
       : '';
     let eportalLogin, eportalLogout;
     if (profile.protocol === 'drcom-eportal') {
@@ -85,13 +85,30 @@ function registerIpc() {
         eportalLogout.port = String(profile.drcomEportal.apiPort);
       }
     }
-    const endpoints = profile.protocol === 'ruijie'
-      ? `${profile.portalDiscovery ? '备用网关' : '锐捷'}发现入口：${profile.ruijie.discoveryUrl}\n${profile.portalDiscovery ? '备用网关允许的' : '允许的'}只读发现跳转来源：\n${[new URL(profile.homepage).origin, ...profile.ruijie.redirectOrigins].join('\n')}\n${profile.portalDiscovery ? '备用' : ''}认证接口：${new URL('/eportal/InterFace.do', profile.homepage).href}\n${profile.portalDiscovery ? '' : '账号和加密后的密码只提交到上述认证接口。\n'}服务名称编码：${profile.ruijie.serviceEncoding === 'percent' ? '百分号编码' : '原始文本'}`
+    let configuredEndpoints;
+    if (profile.protocol === 'drcom-config') {
+      const config = profile.drcomConfig;
+      const gateway = new URL('/', profile.homepage);
+      gateway.port = String(config.apiPort);
+      const loginPath = config.mode === 'web' ? '/drcom/login' : config.mode === 'legacy' ? '/eportal/' : '/eportal/portal/login';
+      const logoutPath = config.logoutMode === 'drcom' ? '/drcom/logout' : config.logoutMode === 'legacy' ? '/eportal/' : '/eportal/portal/logout';
+      configuredEndpoints = `Dr.COM 学校方案\n登录：GET ${new URL(loginPath, config.mode === 'web' ? profile.homepage : gateway).href}\n状态：GET ${new URL('/drcom/chkstatus', profile.homepage).href}\n注销：GET ${new URL(logoutPath, config.logoutMode === 'drcom' ? profile.homepage : gateway).href}\n账号格式和网络服务使用方案中声明的学校参数。操作后独立确认状态。`;
+    }
+    if (profile.protocol === 'srun') {
+      configuredEndpoints = `深澜 Srun\n${['rad_user_info', 'get_challenge', 'srun_portal'].map(path => `GET ${new URL(`/cgi-bin/${path}`, profile.homepage).href}`).join('\n')}\nAC 标识：${profile.srun.acId === 'auto' ? '从当前认证页读取' : profile.srun.acId}\n登录使用学校对应的挑战应答和密码变换，完成后独立查询会话。`;
+    }
+    if (profile.protocol === 'sangfor') {
+      configuredEndpoints = `深信服 Portal\n登录：POST ${new URL('/ac_portal/login.php', profile.homepage).href}\n状态：POST ${new URL('/homepage/info.php', profile.homepage).href}（opr=list，只读查询）\n注销：GET ${new URL('/homepage/logout', profile.homepage).href}\n登录密码使用当前时间戳进行 RC4 变换，操作后独立确认状态。可在连接页填写学校当前认证入口。`;
+    }
+    const endpoints = configuredEndpoints || (profile.protocol === 'ruijie'
+      ? `${profile.portalDiscovery ? '备用网关' : '锐捷'}发现入口：${profile.ruijie.discoveryUrl}\n${profile.portalDiscovery ? '备用网关允许的' : '允许的'}只读发现跳转来源：\n${[new URL(profile.homepage).origin, ...profile.ruijie.redirectOrigins].join('\n')}\n${profile.portalDiscovery ? '备用' : ''}认证接口：${new URL('/eportal/InterFace.do', profile.homepage).href}\n${profile.portalDiscovery ? '' : `${profile.ruijie.passwordMode === 'plain' ? '账号和密码' : '账号和加密后的密码'}只提交到上述认证接口。\n`}服务名称编码：${profile.ruijie.serviceEncoding === 'percent' ? '百分号编码' : '原始文本'}`
       : profile.protocol === 'drcom'
         ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM 接口：\n${['login', 'logout', 'chkstatus'].map(name => `GET ${new URL(`/drcom/${name}`, profile.homepage).href}`).join('\n')}\n使用应用内置的 Dr.COM 请求与状态确认流程。`
       : profile.protocol === 'drcom-eportal'
         ? `${profile.portalDiscovery ? '备用' : ''} Dr.COM ePortal 接口：\nGET ${eportalLogin.href}\nGET ${new URL('/drcom/chkstatus', profile.homepage).href}\nGET ${eportalLogout.href}\n${profile.drcomEportal ? `登录和注销接口仅将认证页同一主机的端口改为 ${profile.drcomEportal.apiPort}；运营商模式追加对应后缀，完整账号模式不追加。` : '使用旧版 ePortal 原始账号登录流程。'}状态确认使用认证页原端口；注销不发送账号密码。`
-        : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`;
+      : profile.protocol === 'drcom-auto'
+        ? 'Dr.COM 自动识别：先读取当前校园门户的页面、同源脚本和只读配置，再确定认证接口、端口和账号格式。可在连接页补充认证地址、端口或前缀；无法确认配置或遇到未支持的加密方式时不提交凭据。'
+        : `请求地址（均与认证页同源）：\n${Object.entries(profile.operations).map(([name, operation]) => `${name}: ${operation.method} ${operation.url}`).join('\n')}`);
     const confirmation = await dialog.showMessageBox(win, {
       type: 'question', title: '确认导入连接方案', message: `导入「${profile.name}」？`,
       detail: `作者：${profile.author || '未填写'}\n版本：${profile.version}\n${profile.portalDiscovery ? '' : `认证页：${profile.homepage}\n\n`}${discovery}${endpoints}\n\n${profile.portalDiscovery ? '自动发现以当前校园网络的认证跳转为依据，请确认连接的是你信任的校园网络。' : '连接时，账号和密码会发送给此方案指定的认证服务器。请确认你信任该方案及其地址。'}`,
@@ -131,7 +148,11 @@ function registerIpc() {
   });
   handle('openPortal', async id => {
     const profile = service.profile(id);
-    const url = safeUrl(profile.portalDiscovery?.url ?? profile.homepage);
+    const selected = profile.id === service.settings.profileId;
+    const automaticEntry = ['drcom-auto', 'sangfor'].includes(profile.protocol) && selected
+      ? service.connection.portalUrl || service.settings.parameters.portalUrl
+      : '';
+    const url = safeUrl(automaticEntry || profile.portalDiscovery?.url || profile.homepage);
     await shell.openExternal(url.href);
   });
   handle('openUrl', async value => {

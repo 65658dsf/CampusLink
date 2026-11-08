@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "swu-ruijie-campus",
+  "name": "西南大学 · 锐捷 ePortal",
+  "description": "西南大学 SWU 锐捷网页认证；使用校园网账号与默认服务，每次登录获取当前门户公钥。已对照 GitHub 源码并通过本地模拟验证，真实校内登录、状态及注销仍待实测。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "http://222.198.127.170/",
+  "protocol": "ruijie",
+  "timeoutMs": 10000,
+  "portalDiscovery": {
+    "url": "http://www.msftconnecttest.com/redirect"
+  },
+  "fields": [
+    {
+      "key": "service",
+      "label": "网络服务",
+      "default": "默认",
+      "options": [
+        {
+          "label": "默认",
+          "value": "默认"
+        }
+      ]
+    }
+  ],
+  "ruijie": {
+    "discoveryUrl": "http://222.198.127.170/",
+    "redirectOrigins": [
+      "http://123.123.123.123"
+    ],
+    "publicKeySource": "page-info",
+    "passwordEncoding": "utf8",
+    "serviceEncoding": "plain"
+  }
+}

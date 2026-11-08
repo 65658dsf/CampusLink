@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const { builtinProfiles, publicProfile, exportProfile } = require('../electron/profiles.cjs');
 
 (async () => {
   const root = path.resolve(__dirname, '..');
@@ -53,7 +54,7 @@ const http = require('node:http');
     const fresh = await welcomePage.evaluate(() => window.campus.getSnapshot());
     assert.equal(fresh.app.firstRun, true);
     assert.equal(fresh.settings.profileId, '');
-    assert.equal(fresh.profiles.length, 4);
+    assert.deepEqual(fresh.profiles, builtinProfiles.map(profile => publicProfile(profile, true)));
     assert.equal(fresh.connection.status, 'idle');
     assert.deepEqual(fresh.settings.parameters, {});
     assert.equal(fresh.logs.some(log => log.message.includes('状态查询')), false);
@@ -64,6 +65,14 @@ const http = require('node:http');
     await expect(welcomePage.getByRole('heading', { name: '景德镇陶瓷大学 · Dr.COM ePortal', exact: true })).toBeVisible();
     await expect(welcomePage.getByRole('button', { name: '打开贵州轻工职业大学认证页', exact: true })).toBeDisabled();
     const search = welcomePage.getByRole('searchbox', { name: '搜索连接方案' });
+    for (const profile of builtinProfiles) {
+      await search.fill(profile.name);
+      const card = welcomePage.locator('.profile-card').filter({ has: welcomePage.getByRole('heading', { name: profile.name, exact: true }) });
+      await expect(card).toBeVisible();
+      await expect(card.getByRole('button', { name: '使用此方案', exact: true })).toBeEnabled();
+      await expect(card.getByRole('button', { name: `导出${profile.name}方案 JSON`, exact: true })).toBeEnabled();
+      await card.screenshot({ path: path.join(root, `artifacts/profile-${profile.id}.png`) });
+    }
     await search.fill('景德镇');
     await expect(welcomePage.locator('.profile-card')).toHaveCount(1);
     await expect(welcomePage.getByRole('heading', { name: '景德镇陶瓷大学 · Dr.COM ePortal', exact: true })).toBeVisible();
@@ -75,7 +84,7 @@ const http = require('node:http');
     await search.fill('NingMeng123');
     await expect(welcomePage.locator('.profile-card')).toHaveCount(fresh.profiles.length);
     await search.fill('RUIJIE');
-    await expect(welcomePage.locator('.profile-card')).toHaveCount(2);
+    await expect(welcomePage.locator('.profile-card')).toHaveCount(builtinProfiles.filter(profile => profile.protocol === 'ruijie').length);
     await search.fill('不存在的学校-no-match');
     await expect(welcomePage.getByRole('heading', { name: '没有找到匹配的连接方案' })).toBeVisible();
     await expect(welcomePage.locator('.profile-card')).toHaveCount(0);
@@ -97,6 +106,39 @@ const http = require('node:http');
     await welcomePage.getByRole('button', { name: '前往配置', exact: true }).click();
     await expect(search).toBeVisible();
     assert.equal(requests.length, 0, 'Navigation and search do not issue authentication requests');
+    const automaticExamplePath = path.join(root, 'examples/drcom-auto.example.json');
+    const automaticExample = JSON.parse(fs.readFileSync(automaticExamplePath, 'utf8'));
+    const importCases = [{ profile: automaticExample, file: automaticExamplePath, confirmation: /Dr\.COM 自动识别/ }];
+    for (const [id, confirmation] of [['builtin-hnust', /Dr\.COM 学校方案/], ['builtin-bit-srun', /深澜 Srun/], ['builtin-gznu-sangfor', /深信服 Portal/], ['builtin-gzmu-drcom-auto', /Dr\.COM 自动识别/]]) {
+      const builtin = builtinProfiles.find(profile => profile.id === id);
+      assert.ok(builtin, `Import smoke fixture must exist: ${id}`);
+      const profile = exportProfile(builtin);
+      const file = path.join(welcomeDirectory, `${profile.id}.json`);
+      fs.writeFileSync(file, JSON.stringify(profile));
+      importCases.push({ profile, file, confirmation });
+    }
+    for (const sample of importCases) {
+      await welcomeApp.evaluate(({ dialog }, file) => {
+        dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
+        dialog.showMessageBox = async (_window, options) => { global.__smokeImportConfirmation = options; return { response: 1 }; };
+      }, sample.file);
+      await welcomePage.getByRole('button', { name: '导入连接方案', exact: true }).click();
+      await expect.poll(async () => (await welcomePage.evaluate(() => window.campus.getSnapshot())).profiles.some(item => item.id === sample.profile.id)).toBe(true);
+      const imported = await welcomePage.evaluate(() => window.campus.getSnapshot());
+      assert.equal(imported.settings.profileId, '', 'Importing a profile does not select or probe it');
+      assert.equal(imported.connection.status, 'idle');
+      assert.equal(imported.profiles.find(item => item.id === sample.profile.id).protocol, sample.profile.protocol);
+      const saved = JSON.parse(fs.readFileSync(path.join(welcomeDirectory, 'settings.json'), 'utf8'));
+      assert.deepEqual(saved.profiles.find(profile => profile.id === sample.profile.id), sample.profile, 'The native import retains complete protocol configuration');
+      const confirmation = await welcomeApp.evaluate(() => global.__smokeImportConfirmation);
+      assert.match(confirmation.detail, sample.confirmation);
+      assert.equal(requests.length, 0, 'Importing a profile issues no authentication requests');
+      await welcomePage.evaluate(id => window.campus.removeProfile(id), sample.profile.id);
+      const removed = await welcomePage.evaluate(() => window.campus.getSnapshot());
+      assert.equal(removed.profiles.some(item => item.id === sample.profile.id), false);
+      assert.equal(removed.settings.profileId, '');
+      assert.equal(requests.length, 0, 'Removing an unselected profile issues no authentication requests');
+    }
     await welcomeApp.evaluate(({ dialog }, file) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
       dialog.showMessageBox = async () => ({ response: 1 });

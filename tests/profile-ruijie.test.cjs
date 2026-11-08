@@ -23,7 +23,8 @@ test('Ruijie examples are importable and distinguish SCU settings from the gener
   assert.equal(builtinProfiles.includes(builtinProfile), true);
   assert.equal(builtinProfiles.includes(builtinRuijieProfile), true);
   for (const profile of [...builtinProfiles, example, scuExample]) {
-    assert.deepEqual(profile.portalDiscovery, { url: DEFAULT_PORTAL_DISCOVERY_URL });
+    if (['srun', 'sangfor'].includes(profile.protocol)) assert.equal(profile.portalDiscovery, undefined);
+    else assert.deepEqual(profile.portalDiscovery, { url: DEFAULT_PORTAL_DISCOVERY_URL });
     assert.deepEqual(publicProfile(profile).portalDiscovery, profile.portalDiscovery);
   }
   assert.deepEqual(profileParameters(builtinRuijieProfile), { service: 'internet' });

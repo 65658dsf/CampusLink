@@ -1,0 +1,2296 @@
+{
+  "schemaVersion": 1,
+  "developer": "NingMeng123",
+  "researchedAt": "2026-11-08",
+  "scope": {
+    "province": "贵州省",
+    "ordinaryUniversities": 80,
+    "rosterAsOf": "2026-06-17",
+    "rosterSources": [
+      {
+        "title": "教育部全国高等学校名单（2026）",
+        "url": "https://hudong.moe.gov.cn/jyb_xxgk/s5743/s5744/202606/t20260618_1441074.html",
+        "publishedAt": "2026-06-18"
+      },
+      {
+        "title": "附件1 全国普通高等学校名单",
+        "url": "https://hudong.moe.gov.cn/jyb_xxgk/s5743/s5744/202606/W020260618416094865984.xls",
+        "sheet": "全国普通高等学校名单",
+        "sha256": "29c40f083b639888e429cf40b68f9a75782d1ce81131c99aabca65b65b36eaea"
+      }
+    ],
+    "adultUniversitiesExcluded": [
+      {
+        "name": "贵州铝厂职工大学",
+        "schoolCode": "4252050962"
+      },
+      {
+        "name": "贵州机械工业职工大学",
+        "schoolCode": "4252050965"
+      },
+      {
+        "name": "贵州开放大学",
+        "schoolCode": "4252051352"
+      }
+    ]
+  },
+  "verification": {
+    "sourceReview": true,
+    "localSimulation": true,
+    "liveCampusTestForAdditions": false
+  },
+  "integrated": [
+    {
+      "id": "builtin-gzqy",
+      "school": "贵州轻工职业大学",
+      "protocol": "drcom",
+      "evidence": "existing-campus-capture",
+      "sources": [
+        "docs/portal-protocol.md"
+      ],
+      "notes": [
+        "保留原有网关与已核验流程"
+      ]
+    },
+    {
+      "id": "builtin-gznu-sangfor",
+      "school": "贵州师范大学",
+      "protocol": "sangfor",
+      "evidence": {
+        "login": "school-source-and-compatible-portal",
+        "status": "compatible-portal-source",
+        "logout": "compatible-portal-source"
+      },
+      "sources": [
+        {
+          "url": "https://github.com/jang1998/gznu_schlloNet/blob/ae96a6e91dfc3287060280bdba41e897c9e4b6ce/request_school.py",
+          "role": "本校登录协议",
+          "facts": [
+            "POST http://1.1.1.3/ac_portal/login.php",
+            "opr=pwdLogin",
+            "userName、pwd、auth_tag、rememberPwd=0",
+            "原代码依赖手动抓包的pwd和auth_tag"
+          ]
+        },
+        {
+          "url": "https://github.com/jang1998/gznu_schlloNet/blob/ae96a6e91dfc3287060280bdba41e897c9e4b6ce/school.py",
+          "role": "本校正常登录入口与表单",
+          "facts": [
+            "20191008142058/pc.html模板",
+            "账号input id=password_name",
+            "密码input id=password_pwd",
+            "提交按钮id=password_submitBtn",
+            "原版以Selenium直接输入原始用户名密码完成登录"
+          ]
+        },
+        {
+          "url": "https://github.com/imcyx/SIAS-AutoLink/blob/d55ba00353c28a7b3fcf235f77679a5c0746108c/login_network.py",
+          "role": "同代Sangfor动态RC4字段实现",
+          "facts": [
+            "auth_tag为当前毫秒时间戳",
+            "pwd为RC4(password, str(auth_tag))的hex结果",
+            "opr=pwdLogin且字段与贵州师范大学一致"
+          ]
+        },
+        {
+          "url": "https://github.com/JairHan/SUTAutoAuthGDWIFI/blob/f8a6f944adb7d3cecd41a0365f89e6a35e9bb617/rc4.js",
+          "role": "公开保存的原门户密码算法",
+          "facts": [
+            "密码使用$.trim",
+            "使用JavaScript charCodeAt进行RC4，处理UTF-16代码单元",
+            "低于16的hex值补一个0，不将非ASCII字符转换UTF-8"
+          ]
+        },
+        {
+          "url": "https://github.com/JairHan/SUTAutoAuthGDWIFI/blob/f8a6f944adb7d3cecd41a0365f89e6a35e9bb617/index.js",
+          "role": "公开保存的原门户状态和注销协议",
+          "facts": [
+            "31至69行 POST /homepage/info.php，opr=list",
+            "success=true时使用data.basic.name作为当前认证用户名",
+            "252至264行 GET /homepage/logout，success=true时返回/homepage/login.html"
+          ]
+        },
+        {
+          "url": "https://github.com/LeeAstra/autologin-sias/blob/8e5e527d476c94cac8b62c364b61421c23d8f0fa/src/sias_autologin/core/state.py",
+          "role": "同代明确离线状态判定",
+          "facts": [
+            "success=false且location为同源/ac_portal/needauth.html才认为需要认证",
+            "其它失败或未知结构保持unknown"
+          ]
+        },
+        {
+          "url": "https://github.com/zhy617/USTC-Network/blob/b6d77dad641375d7f4ebd28001b3e042d444cce2/ustc_suzhou_auth.py",
+          "role": "同代AUTHSESSID与状态复核",
+          "facts": [
+            "通过访问门户页建立AUTHSESSID",
+            "认证后调用info.php确认登录",
+            "GET /homepage/logout进行注销"
+          ]
+        }
+      ],
+      "notes": [
+        "GZNU本校源码来自2022年，当前校区的门户部署可能已变化",
+        "同代厂商状态和注销协议经过公开源码复核，贵州师范大学网关当前返回结构需要在校内实测",
+        "无校园网连接和账号，未对真实认证服务器发送登录或注销请求"
+      ]
+    },
+    {
+      "id": "builtin-gzmu-drcom-auto",
+      "school": "贵州民族大学",
+      "protocol": "drcom-auto",
+      "evidence": {
+        "loginForm": "school-userscript",
+        "wire": "current-portal-detection",
+        "status": "protocol-compatible",
+        "logout": "protocol-compatible"
+      },
+      "sources": [
+        {
+          "repository": "yangyunuo6666/taobao_scrapy",
+          "commit": "c1caa16a5acf80a4813c068ba8f01a5799d5eb27",
+          "path": "实用的小程序/gzmu校园网登录.js",
+          "url": "https://github.com/yangyunuo6666/taobao_scrapy/blob/c1caa16a5acf80a4813c068ba8f01a5799d5eb27/实用的小程序/gzmu校园网登录.js",
+          "facts": [
+            "标题明确为贵州民族大学校园网自动登录",
+            "填写DDDDD、upass并点击0MKKey",
+            "服务值含@xyw、空值、@yd、@lt",
+            "地址只给出*.101.6.51/a79.htm",
+            "文件标注MIT"
+          ]
+        }
+      ],
+      "notes": [
+        "公开脚本没有给出完整网关和HTTP请求实现，当前入口、接口、端口和账号格式需从校园门户读取",
+        "@lt注释与服务名称存在冲突，客户端按当前页面标签选择服务",
+        "未将不完整匹配地址扩写为猜测的完整IP",
+        "本地测试使用合成Dr.COM页面，当前学校页面能否完整识别仍需校内验证"
+      ]
+    }
+  ],
+  "limitations": [
+    "此前只核实部分学校，贵州新增0所的结论过早，本次按80所普通高校逐校执行GitHub检索",
+    "仓库描述检索会漏掉放在个人杂项仓库里的脚本，本轮补充了旧名、缩写及代码字段查询",
+    "搜索索引、关键词与排序影响覆盖率，未命中仅表示本轮未找到可实施方案",
+    "厂商支持名单、设备采购、统一身份系统及VPN资料分别记录为线索，接入范围以列出的协议证据为准",
+    "GitHub搜索的索引、关键词与结果排序会影响覆盖率。未命中仅表示本轮未发现可实施的公开认证脚本。",
+    "部分代码结果仅列出高校或认证一词，并不涉及校园网登录。",
+    "尚未逐一确认本组40所学校当前认证门户域名。"
+  ],
+  "schools": [
+    {
+      "schoolCode": "4152010657",
+      "school": "贵州大学",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州大学 PPPoE",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzu 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "GuizhouUniversity",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzu eportal",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzu DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010660",
+      "school": "贵州医科大学",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州医科大学",
+          "failed": false,
+          "returnedResults": 20
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州医科大学神奇民族医药学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵阳医学院 drcom",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gmc 校园网",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "贵州医科大学 认证",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010661",
+      "school": "遵义医科大学",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "遵义医科大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "遵义医科大学医学与科技学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "zmu DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "zmu eportal",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "遵义医学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010662",
+      "school": "贵州中医药大学",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州中医药大学",
+          "failed": false,
+          "returnedResults": 20
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州中医药大学时珍学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzy DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzucm eportal",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "贵阳中医学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010663",
+      "school": "贵州师范大学",
+      "aliases": [],
+      "status": "integrated-with-stated-evidence",
+      "profileId": "builtin-gznu-sangfor",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州师范大学 校园网",
+          "failed": false,
+          "returnedResults": 1
+        }
+      ],
+      "note": {
+        "login": "school-source-and-compatible-portal",
+        "status": "compatible-portal-source",
+        "logout": "compatible-portal-source"
+      }
+    },
+    {
+      "schoolCode": "4152010664",
+      "school": "遵义师范学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "遵义师范学院",
+          "failed": false,
+          "returnedResults": 20
+        },
+        {
+          "type": "github-code",
+          "query": "zync DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "遵义师范 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "zync eportal",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010665",
+      "school": "铜仁学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "铜仁学院",
+          "failed": false,
+          "returnedResults": 20
+        },
+        {
+          "type": "github-code",
+          "query": "gztrc DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "铜仁学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gztrc eportal",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010666",
+      "school": "兴义民族师范学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "兴义民族师范学院",
+          "failed": false,
+          "returnedResults": 20
+        },
+        {
+          "type": "github-code",
+          "query": "兴义民族师范 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "xynun DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "xynun eportal",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010667",
+      "school": "安顺学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "安顺学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "asu.edu.cn DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "asu.edu.cn eportal",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "安顺学院 认证",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010668",
+      "school": "贵州工程应用技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州工程应用技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "毕节学院 校园网",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "贵州工程应用 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gues DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010669",
+      "school": "凯里学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "凯里学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "kluniv ac_portal",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "凯里学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "官方视频存在Sangfor门户证据，另由协议子任务核验。"
+    },
+    {
+      "schoolCode": "4152010670",
+      "school": "黔南民族师范学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "黔南民族师范学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "黔南民族师范 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "sgmtu DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010671",
+      "school": "贵州财经大学",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州财经大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州财经学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gufe eportal",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gufe DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010672",
+      "school": "贵州民族大学",
+      "aliases": [],
+      "status": "integrated-with-stated-evidence",
+      "profileId": "builtin-gzmu-drcom-auto",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州民族大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州民族大学 登录",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzmu DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州民族学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": {
+        "loginForm": "school-userscript",
+        "wire": "current-portal-detection",
+        "status": "protocol-compatible",
+        "logout": "protocol-compatible"
+      }
+    },
+    {
+      "schoolCode": "4152010976",
+      "school": "贵阳学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵阳学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gyu.cn DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵阳学院 drcom",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152010977",
+      "school": "六盘水师范学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "六盘水师范学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "六盘水师范 drcom",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "lpssy eportal",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "lpssy DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152011731",
+      "school": "贵州商学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州商学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州商业高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzcc DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012107",
+      "school": "贵州警察学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州警察学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州警官职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzpc DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013647",
+      "school": "贵州中医药大学时珍学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州中医药大学时珍学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzyszxy DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "时珍学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013648",
+      "school": "贵州黔南经济学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州黔南经济学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州黔南经济 DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州财经大学商务学院 校园网",
+          "failed": false,
+          "returnedResults": 2
+        },
+        {
+          "type": "github-code",
+          "query": "qnxy eportal",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013649",
+      "school": "贵州黔南科技学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州黔南科技学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzucst DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州大学科技学院 校园网",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013650",
+      "school": "贵阳信息科技学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵阳信息科技学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "明德学院 eportal",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州大学明德学院 校园网",
+          "failed": false,
+          "returnedResults": 8
+        },
+        {
+          "type": "github-code",
+          "query": "gyiist DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013651",
+      "school": "贵阳人文科技学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵阳人文科技学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州民族大学人文科技学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzmdrw DDDDD",
+          "failed": false,
+          "returnedResults": 1
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152016206",
+      "school": "贵阳康养职业大学",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵阳康养职业大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gynvc DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        },
+        {
+          "type": "github-code",
+          "query": "贵阳护理职业学院 校园网",
+          "failed": false,
+          "returnedResults": 1
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013653",
+      "school": "遵义医科大学医学与科技学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "遵义医科大学医学与科技学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "遵医三院 DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "遵义医学院医学与科技学院 校园网",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013676",
+      "school": "贵州医科大学神奇民族医药学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州医科大学神奇民族医药学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gysqxy DDDDD",
+          "failed": false,
+          "returnedResults": 3
+        },
+        {
+          "type": "github-code",
+          "query": "神奇民族医药 校园网",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152014223",
+      "school": "贵州师范学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州师范学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州师范学院 drcom",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gznc eportal",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "贵州教育学院 校园网",
+          "failed": false,
+          "returnedResults": 6
+        },
+        {
+          "type": "github-code",
+          "query": "gznc DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152014440",
+      "school": "贵州理工学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州理工学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "git.edu.cn DDDDD",
+          "failed": false,
+          "returnedResults": 1
+        },
+        {
+          "type": "github-code",
+          "query": "贵州理工 eportal",
+          "failed": false,
+          "returnedResults": 3
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152014625",
+      "school": "茅台学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "茅台学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "mtxy DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        },
+        {
+          "type": "github-code",
+          "query": "茅台学院 eportal",
+          "failed": false,
+          "returnedResults": 3
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012222",
+      "school": "贵州交通职业大学",
+      "aliases": [
+        "贵州交通职业技术学院"
+      ],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州交通职业大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州交通职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州交通职业技术学院 DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzjtzy eportal",
+          "failed": false,
+          "returnedResults": 7
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013055",
+      "school": "铜仁职业技术大学",
+      "aliases": [
+        "铜仁职业技术学院"
+      ],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "铜仁职业技术大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "铜仁职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "铜仁职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 10
+        },
+        {
+          "type": "github-code",
+          "query": "trzy DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013818",
+      "school": "贵州轻工职业大学",
+      "aliases": [
+        "贵州轻工职业技术学院"
+      ],
+      "status": "integrated-with-stated-evidence",
+      "profileId": "builtin-gzqy",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州轻工职业大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州轻工职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州轻工职业技术学院 DDDDD",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzqy DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "existing-campus-capture"
+    },
+    {
+      "schoolCode": "4152014412",
+      "school": "贵州工商职业大学",
+      "aliases": [
+        "贵州工商职业学院"
+      ],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州工商职业大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州工商职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州工商职业学院 校园网",
+          "failed": false,
+          "returnedResults": 1
+        },
+        {
+          "type": "github-code",
+          "query": "gzgsc DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152013052",
+      "school": "贵州工业职业技术大学",
+      "aliases": [
+        "贵州工业职业技术学院"
+      ],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州工业职业技术大学 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-repositories",
+          "query": "贵州工业职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzky DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        },
+        {
+          "type": "github-code",
+          "query": "贵州工业职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152011663",
+      "school": "黔南民族医学高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "黔南民族医学高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "黔南民族医学 校园网",
+          "failed": false,
+          "returnedResults": 6
+        },
+        {
+          "type": "github-code",
+          "query": "qnmc DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012223",
+      "school": "贵州航天职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州航天职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "gzhtzy DDDDD",
+          "failed": false,
+          "returnedResults": 1
+        },
+        {
+          "type": "github-code",
+          "query": "贵州航天 校园网",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012336",
+      "school": "贵州电子信息职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "贵州电子信息职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "贵州电子信息 校园网",
+          "failed": false,
+          "returnedResults": 6
+        },
+        {
+          "type": "github-code",
+          "query": "gzeic DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012821",
+      "school": "安顺职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "安顺职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "安顺职院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "asotc DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012822",
+      "school": "黔东南民族职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "黔东南民族职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "黔东南民族职业 校园网",
+          "failed": false,
+          "returnedResults": 2
+        },
+        {
+          "type": "github-code",
+          "query": "qdnpt DDDDD",
+          "failed": false,
+          "returnedResults": 10
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012823",
+      "school": "黔南民族职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github-repositories",
+          "query": "黔南民族职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github-code",
+          "query": "黔南民族职业 校园网",
+          "failed": false,
+          "returnedResults": 3
+        },
+        {
+          "type": "github-code",
+          "query": "qnzy DDDDD",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "本轮命中结果未核实出可实施的校园网登录方案。"
+    },
+    {
+      "schoolCode": "4152012824",
+      "school": "遵义职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "遵义职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "遵义职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152012850",
+      "school": "贵州城市职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州城市职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州城市职业学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152013053",
+      "school": "贵州电力职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州电力职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州电力职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152013054",
+      "school": "六盘水职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "六盘水职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "六盘水职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152013817",
+      "school": "黔西南民族职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "黔西南民族职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "黔西南民族职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014011",
+      "school": "遵义医药高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "遵义医药高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "遵义医药高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014129",
+      "school": "贵阳职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵阳职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵阳职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014198",
+      "school": "毕节职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "毕节职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "毕节职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014252",
+      "school": "贵州职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014371",
+      "school": "贵州盛华职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州盛华职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州盛华职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014469",
+      "school": "贵阳幼儿师范高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵阳幼儿师范高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵阳幼儿师范高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014470",
+      "school": "铜仁幼儿师范高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "铜仁幼儿师范高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "铜仁幼儿师范高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014497",
+      "school": "黔南民族幼儿师范高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "黔南民族幼儿师范高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "黔南民族幼儿师范高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014499",
+      "school": "毕节医学高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "毕节医学高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "毕节医学高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 4
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014516",
+      "school": "贵州建设职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州建设职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州建设职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014538",
+      "school": "毕节幼儿师范高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "毕节幼儿师范高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "毕节幼儿师范高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014549",
+      "school": "贵州农业职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州农业职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州农业职业学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014558",
+      "school": "贵州工程职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州工程职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州工程职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014559",
+      "school": "贵州工贸职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州工贸职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州工贸职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014577",
+      "school": "贵州水利水电职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州水利水电职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州水利水电职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014578",
+      "school": "贵州电子商务职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州电子商务职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州电子商务职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 0
+        }
+      ],
+      "note": "所列查询未获得直接候选。"
+    },
+    {
+      "schoolCode": "4152014579",
+      "school": "贵州应用技术职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州应用技术职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州应用技术职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014580",
+      "school": "贵州电子科技职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州电子科技职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州电子科技职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014613",
+      "school": "贵州装备制造职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州装备制造职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州装备制造职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014614",
+      "school": "贵州健康职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州健康职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州健康职业学院 认证",
+          "failed": false,
+          "returnedResults": 4
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014615",
+      "school": "贵州食品工程职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州食品工程职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州食品工程职业学院 认证",
+          "failed": false,
+          "returnedResults": 6
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014616",
+      "school": "贵州经贸职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州经贸职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州经贸职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 5
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014617",
+      "school": "贵州护理职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州护理职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州护理职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 5
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014630",
+      "school": "六盘水幼儿师范高等专科学校",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "六盘水幼儿师范高等专科学校 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "六盘水幼儿师范高等专科学校 认证",
+          "failed": false,
+          "returnedResults": 4
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014648",
+      "school": "毕节工业职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "毕节工业职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "毕节工业职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 4
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014733",
+      "school": "贵州机电职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州机电职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州机电职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 5
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014734",
+      "school": "贵州财经职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州财经职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州财经职业学院 认证",
+          "failed": false,
+          "returnedResults": 5
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014735",
+      "school": "贵州民用航空职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州民用航空职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州民用航空职业学院 认证",
+          "failed": false,
+          "returnedResults": 5
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014769",
+      "school": "贵州文化旅游职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州文化旅游职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州文化旅游职业学院 认证",
+          "failed": false,
+          "returnedResults": 3
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4252050963",
+      "school": "贵州航空职业技术学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州航空职业技术学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州航空职业技术学院 认证",
+          "failed": false,
+          "returnedResults": 5
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014799",
+      "school": "贵州体育职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州体育职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州体育职业学院 认证",
+          "failed": false,
+          "returnedResults": 1
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014800",
+      "school": "贵州铜仁数据职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州铜仁数据职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州铜仁数据职业学院 认证",
+          "failed": false,
+          "returnedResults": 3
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014848",
+      "school": "贵州传媒职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州传媒职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州传媒职业学院 认证",
+          "failed": false,
+          "returnedResults": 2
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014849",
+      "school": "贵州生态能源职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "贵州生态能源职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "贵州生态能源职业学院 认证",
+          "failed": false,
+          "returnedResults": 3
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    },
+    {
+      "schoolCode": "4152014850",
+      "school": "黔东南理工职业学院",
+      "aliases": [],
+      "status": "no-verified-implementation-found-in-this-pass",
+      "queries": [
+        {
+          "type": "github_repositories",
+          "query": "黔东南理工职业学院 校园网",
+          "failed": false,
+          "returnedResults": 0
+        },
+        {
+          "type": "github_code",
+          "query": "黔东南理工职业学院 认证",
+          "failed": false,
+          "returnedResults": 2
+        }
+      ],
+      "note": "认证相关结果均为院校数据、招生系统、词典、论文或统一身份认证资料。未取得校园网上网认证请求。"
+    }
+  ],
+  "excludedMatches": [
+    "xiataoboy/GZYDRCOM对应江西赣州职业技术学院",
+    "shinanaa/guizhourenzheng为业务认证系统",
+    "Diamochang/AccesserCTC为代理工具"
+  ],
+  "additionalFindings": [
+    {
+      "school": "凯里学院",
+      "candidateOrigin": "https://ty.kluniv.edu.cn",
+      "evidence": "学校公开Wifi指南视频可见/ac_portal路径，学校网络建设材料提及深信服，但本轮外网只读访问该域名TLS连接失败，无法取得当前表单与JS。",
+      "readyProfile": false,
+      "reason": "尚未得到该校可复核的校园认证字段和表单，不据厂商同名直接声称学校已适配。"
+    },
+    {
+      "school": "贵州财经职业学院",
+      "url": "https://github.com/Restonweb/ObsidianStorge/blob/01a2e48faca1ed8b57cb0870319de803f311d121/MyStudyRoute/PENTEST/Document/GZCJ.md",
+      "assessment": "记录统一身份认证、办事大厅等域名，没有校园网上网认证实现。"
+    },
+    {
+      "school": "贵州机电职业技术学院",
+      "url": "https://github.com/kuailiaojie/classtable/blob/6e959faca3b6bc6ef9dfa9f09916552a23d0197c/app/src/main/assets/warehouse/adapters.json",
+      "assessment": "课程表适配仓库，属于教务系统访问，并非校园网认证。"
+    },
+    {
+      "school": "贵州工业职业技术大学（本组外）",
+      "url": "https://github.com/CollegesChat/university-information/discussions/393",
+      "assessment": "原学生2025年讨论称离校时联通套餐使用哆点，支持作为Drcom家族候选证据。没有请求字段与网关。已报告主agent。"
+    }
+  ]
+}

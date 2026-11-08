@@ -4,6 +4,10 @@ const { request, parseJsonOrJsonp, CampusError } = require('./transport.cjs');
 const { createDiagnostic, sanitizeText } = require('./diagnostics.cjs');
 const { ruijieOperation } = require('./ruijie.cjs');
 const { drcomEportalOperation } = require('./drcom-eportal.cjs');
+const { drcomAutoOperation } = require('./drcom-auto.cjs');
+const { drcomConfigOperation } = require('./drcom-config.cjs');
+const { srunOperation } = require('./srun.cjs');
+const { sangforOperation } = require('./sangfor.cjs');
 const { portalRequest } = require('./portal-transport.cjs');
 const { discoverPortal } = require('./portal-discovery.cjs');
 
@@ -11,9 +15,12 @@ const { discoverPortal } = require('./portal-discovery.cjs');
 // query strings and cookies never enter settings, public profiles or the cache.
 const discoveredPortals = new Map();
 async function resolvePortalProfile(profile, requester) {
+  // Automatic Dr.COM resolves both the entry and wire parameters per operation.
+  if (profile.protocol === 'drcom-auto') return profile;
   if (!profile.portalDiscovery) return profile;
   const key = JSON.stringify([profile.id, profile.homepage, profile.protocol, profile.portalDiscovery.url]);
-  const found = await discoverPortal(profile, requester);
+  const discoveryProfile = profile.protocol === 'drcom-config' ? { ...profile, protocol: 'drcom-eportal' } : profile;
+  const found = await discoverPortal(discoveryProfile, requester);
   if (found) {
     if (discoveredPortals.size >= 32) discoveredPortals.delete(discoveredPortals.keys().next().value);
     discoveredPortals.set(key, { homepage: found.homepage, redirectOrigins: found.redirectOrigins });
@@ -22,7 +29,7 @@ async function resolvePortalProfile(profile, requester) {
   if (!endpoint) return profile;
   return {
     ...profile, homepage: endpoint.homepage,
-    ...(profile.protocol === 'drcom-eportal' ? {
+    ...(['drcom-eportal', 'drcom-config'].includes(profile.protocol) ? {
       // Keep the configured landing path, but never cache a device query.
       homepage: new URL(new URL(profile.homepage).pathname, endpoint.homepage).href,
       ...(found ? { discoveredEntry: found.entryUrl } : {}),
@@ -152,7 +159,7 @@ async function runOperation(profile, operation, context = {}, requester) {
     let captured = false;
     const observedOptions = { ...options, diagnosticSecrets: secrets, onDiagnostic: detail => { captured = true; diagnostics.push(detail); } };
     try {
-      const transport = requester || (['ruijie', 'drcom-eportal'].includes(profile.protocol) || options.allowRedirect ? portalRequest : request);
+      const transport = requester || (['ruijie', 'drcom-eportal', 'drcom-auto', 'drcom-config', 'srun', 'sangfor'].includes(profile.protocol) || options.allowRedirect ? portalRequest : request);
       const text = await transport(url, observedOptions, timeout);
       // Custom/mock transports can keep returning text; still provide useful context.
       if (!captured) diagnostics.push(createDiagnostic(url, observedOptions, { responseBody: text, durationMs: Date.now() - started }));
@@ -164,9 +171,11 @@ async function runOperation(profile, operation, context = {}, requester) {
   };
   try {
     const effectiveProfile = await resolvePortalProfile(profile, observedRequest);
-    const adapter = profile.protocol === 'drcom' ? drcomOperation : profile.protocol === 'ruijie' ? ruijieOperation : profile.protocol === 'drcom-eportal' ? drcomEportalOperation : genericOperation;
+    const adapters = { drcom: drcomOperation, ruijie: ruijieOperation, 'drcom-eportal': drcomEportalOperation, 'drcom-auto': drcomAutoOperation, 'drcom-config': drcomConfigOperation, srun: srunOperation, sangfor: sangforOperation, http: genericOperation };
+    if (!Object.hasOwn(adapters, profile.protocol)) throw new CampusError('认证协议不受支持。', 'UNSUPPORTED_PROTOCOL');
+    const adapter = adapters[profile.protocol];
     const result = await adapter(effectiveProfile, operation, context, observedRequest, value => { if (!secrets.includes(value)) secrets.push(value); });
-    return { ...result, portalUrl: new URL(effectiveProfile.homepage).origin + '/' };
+    return { ...result, portalUrl: result.portalUrl || new URL(effectiveProfile.homepage).origin + '/' };
   } catch (error) {
     const safeError = error instanceof CampusError ? error : new CampusError('操作未完成，请检查校园网络或打开认证页重试。');
     safeError.message = sanitizeText(safeError.message, secrets);

@@ -13,6 +13,16 @@ export const projectIntro = '岚连 Campus Link 是面向 Windows / macOS 的校
 
 export const journalEntries: JournalEntry[] = [
   {
+    version: '1.1.5', date: '2026-11-08', title: '高校扩展与认证参数自动识别',
+    items: [
+      '内置方案扩展至 28 所高校，另提供 Dr.COM 自动识别通用方案。',
+      'Dr.COM 可从当前门户读取接口、端口、账号前缀和服务，补充深澜挑战应答及深信服 Portal。',
+      '贵州新增贵州师范大学和贵州民族大学，接入依据与逐校检索记录随仓库公开。',
+      '完善方案导入导出、持久化失败处理、独立状态复核与诊断脱敏。',
+      '新增学校经过源码对照和本地模拟测试，真实校园认证仍需校内验收。',
+    ],
+  },
+  {
     version: '1.1.4', date: '2026-10-30', title: '按景陶实际请求修正认证',
     items: [
       '景陶登录改用同主机 801 端口的新版 ePortal 接口，匹配 4.2.1 参数与重复语言字段。',

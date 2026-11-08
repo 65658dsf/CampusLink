@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "id": "drcom-auto-campus",
+  "name": "Dr.COM 自动识别 · 通用方案",
+  "description": "自动发现当前校园网并读取认证接口、端口、账号前缀和运营商配置。适用于可识别的 Dr.COM Web / ePortal 网页认证；遇到额外加密或不明确参数时提示补充配置。",
+  "version": "1.0.0",
+  "author": "NingMeng123",
+  "homepage": "http://www.msftconnecttest.com/redirect",
+  "protocol": "drcom-auto",
+  "timeoutMs": 10000,
+  "portalDiscovery": {
+    "url": "http://www.msftconnecttest.com/redirect"
+  },
+  "fields": [
+    {
+      "key": "operator",
+      "label": "网络服务",
+      "default": "auto",
+      "options": [
+        {
+          "label": "自动（使用网页默认服务）",
+          "value": "auto"
+        },
+        {
+          "label": "校园网",
+          "value": "campus"
+        },
+        {
+          "label": "中国电信",
+          "value": "telecom"
+        },
+        {
+          "label": "中国移动",
+          "value": "cmcc"
+        },
+        {
+          "label": "中国联通",
+          "value": "unicom"
+        },
+        {
+          "label": "完整账号（不追加后缀）",
+          "value": "raw"
+        }
+      ]
+    },
+    {
+      "key": "portalUrl",
+      "label": "认证页（可选）",
+      "default": "",
+      "placeholder": "留空自动发现，例如 http://10.0.0.1/"
+    },
+    {
+      "key": "apiPort",
+      "label": "认证端口（可选）",
+      "default": "",
+      "placeholder": "留空自动读取，例如 801"
+    },
+    {
+      "key": "accountPrefix",
+      "label": "账号前缀（auto 自动 / none 无）",
+      "default": "auto",
+      "placeholder": "auto 自动；none 无前缀；或填写 ,0,"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 面向 Windows 和 macOS 的校园网认证工具，使用 Electron、React 和 TypeScript 构建。提供扁平化中文界面、连接状态、系统托盘、可配置的开机自启动，以及通过 JSON 导入的校园网连接方案。
 
-内置贵州轻工职业大学的 Dr.COM 配置、四川大学与成都理工大学（宜宾校区）的锐捷 ePortal Web 配置，以及景德镇陶瓷大学的 Dr.COM ePortal 配置；其他学校可导入对应 JSON 方案。首次打开不预选学校，先到“连接方案”页搜索并选择适合自己的方案。内置方案优先通过 `http://www.msftconnecttest.com/redirect` 只读探测当前网络的真实认证地址，原有学校地址保留为已知回退入口。本工具是独立的校园网辅助工具，与学校或认证服务商没有官方隶属关系。
+内置 28 所高校连接方案，覆盖 Dr.COM、锐捷 ePortal、深澜 Srun 和深信服 Portal，另有 Dr.COM 自动识别通用方案。首次打开先到“连接方案”页搜索并选择学校。支持自动发现的方案会通过 `http://www.msftconnecttest.com/redirect` 只读探测当前网络的认证地址。贵州师范大学使用公开源码中的深信服入口，也可填写当前认证页。贵州民族大学从校园页面识别 Dr.COM 参数。其他学校可导入对应 JSON 方案，新增高校的证据与验证范围见接入记录。[Dr.COM 自动识别](drcom-auto-guide.md) · [高校接入记录](university-adapters.md)
 
 开发者：**NingMeng123** · [GitHub 主页](https://github.com/65658dsf)
 
@@ -12,19 +12,19 @@
 
 ## 安装和首次连接
 
-在 [GitHub Releases](https://github.com/65658dsf/CampusLink/releases) 按系统和处理器选择安装包。v1.1.4 的构建目标为：
+在 GitHub Releases 按系统和处理器选择安装包，当前版本为 v1.1.5。[下载页面](https://github.com/65658dsf/CampusLink/releases/tag/v1.1.5)
 
 ```text
-Campus-Link-Setup-1.1.4.exe          Windows x64
-Campus-Link-1.1.4-mac-x64.dmg        Intel Mac
-Campus-Link-1.1.4-mac-arm64.dmg      Apple Silicon Mac
+Campus-Link-Setup-1.1.5.exe          Windows x64
+Campus-Link-1.1.5-mac-x64.dmg        Intel Mac
+Campus-Link-1.1.5-mac-arm64.dmg      Apple Silicon Mac
 ```
 
 macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程序”，再从该目录运行。默认构建未配置开发者签名或 Apple 公证，系统可能阻止打开；请核对来源并按照系统提示处理，不要关闭系统安全保护。未签名或未公证时，macOS 开机自启动也可能不可用。macOS 打包与系统行为仍需对应设备验证，不能将 CI 产物视为已完成校园网实测。
 
 1. Windows 运行安装程序并选择安装位置：浏览选择父目录时会自动追加 `Campus Link` 文件夹，手动输入的目录也会在安装前补全，已以该名称结尾时不会重复添加；macOS 安装到“应用程序”，然后打开“岚连 Campus Link”。
 2. 先在系统中连接校园 Wi-Fi，或插入校园网网线。本工具完成网络认证，不代替操作系统的无线网络连接功能。
-3. 首次打开会引导前往“连接方案”，搜索学校并点击“使用此方案”。贵州轻工职业大学的网络类型保持“校园网”；四川大学选择账号已开通的网络服务；成都理工大学（宜宾校区）无需选择服务；景德镇陶瓷大学选择学校网页对应的中国电信、中国移动、中国联通或“测试”，也可选“其他”填写完整账号，详见下方适配说明。其他学校请导入匹配方案，所有内置方案均直接展示。
+3. 首次打开会引导前往“连接方案”，搜索学校并点击“使用此方案”。贵州轻工职业大学的网络类型保持“校园网”；四川大学选择账号已开通的网络服务；成都理工大学（宜宾校区）无需选择服务；景德镇陶瓷大学选择学校网页对应的中国电信、中国移动、中国联通或“测试”，也可选“其他”填写完整账号，详见下方适配说明。重庆大学使用完整学校账号，西南大学保持默认服务；其他 Dr.COM 学校可选择自动识别方案，先保持自动端口和前缀，识别不完整时再按实际页面补充。所有内置方案均直接展示。
 4. 选择方案后，应用会自动检测当前认证状态；以后启动沿用已保存的方案。若已通过认证，直接显示“已登录校园网”和会话详情，不再显示账号密码表单，也无须重复登录。未选择方案时不会请求学校认证服务器。
 5. 尚未认证时，输入学校提供的账号、密码，按需勾选“记住密码”，再点击连接按钮。
 
@@ -104,7 +104,7 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 
 ## 扩展其它校园网
 
-应用支持四类**声明式 JSON 方案**：`http` 用于固定 GET/POST 接口与响应规则；`drcom` 复用应用受控的 Dr.COM Web 适配器；`drcom-eportal` 使用 Dr.COM 的 `/eportal/` 登录流程；`ruijie` 使用受控的锐捷 ePortal Web 适配器，自动获取当前认证参数并完成 RSA 密码变换。它不加载或执行导入文件中的 JavaScript、Python 或可执行程序。
+应用支持七类**声明式 JSON 方案**：`drcom-auto` 每次操作只读识别当前网页配置；`drcom-config` 保存已核对的学校请求参数；`srun` 使用深澜 BX1 挑战应答；`http` 用于固定 GET/POST 接口与响应规则；`drcom` 复用应用受控的 Dr.COM Web 适配器；`drcom-eportal` 使用 Dr.COM 的 `/eportal/` 登录流程；`ruijie` 使用受控的锐捷 ePortal Web 适配器，自动获取当前认证参数并完成 RSA 密码变换。它不加载或执行导入文件中的 JavaScript、Python 或可执行程序。
 
 1. 固定 HTTP 接口点击“导出方案示例”，或复制 [custom-campus.example.json](../examples/custom-campus.example.json)；锐捷 ePortal 点击“导出锐捷示例”，或复制 [ruijie-campus.example.json](../examples/ruijie-campus.example.json)。景德镇陶瓷大学可从内置方案卡片“导出 JSON”，或使用 [jdztc-campus.example.json](../examples/jdztc-campus.example.json)。
 2. 根据学校真实认证接口修改地址、请求参数和响应规则。示例中的 `.invalid` 域名是占位符，不能直接登录；其中运营商选项也只是格式示例。
@@ -117,7 +117,7 @@ macOS 同时提供相应架构的 ZIP。DMG 打开后将应用拖入“应用程
 
 内置四川大学方案参考上游 ePortal Web 实现，支持确认在线、登录、注销及现有网络守护流程。它不是所有锐捷校园网的通用配置，也不支持锐捷 802.1X 客户端认证；其他学校需要替换入口、跳转源、服务值和公钥。当前只完成源码对照与本地模拟服务验证，**未在四川大学真实网络验证**。来源提交和第三方许可见 [锐捷方案教程](ruijie-guide.md#参考来源与许可) 与 [第三方声明](../assets/licenses/README.md)。
 
-`drcom` / `drcom-eportal` / `ruijie` 方案可使用顶层 `portalDiscovery: { "url": "http://www.msftconnecttest.com/redirect" }` 开启网络入口发现；内置方案、锐捷示例与景陶示例默认配置。`homepage` 仍是必须填写的已知回退地址，`ruijie.discoveryUrl` 保留为与它同源的已知发现入口。景陶新版通过 `drcomEportal: { "variant": "portal-v4", "apiPort": 801 }` 显式使用同主机 801 端口；旧 JSON 省略此配置时保留旧流程。发现功能不会自动识别所有校园网协议，也不会替你选择其他学校的服务或 RSA 公钥。v1.1.4 的更新与验收边界见 [发布说明](releases-v1.1.4.md)。
+`drcom` / `drcom-eportal` / `drcom-auto` / `ruijie` 方案可使用顶层 `portalDiscovery: { "url": "http://www.msftconnecttest.com/redirect" }` 开启网络入口发现；内置方案、锐捷示例与景陶示例默认配置。`homepage` 仍是必须填写的已知回退地址，`ruijie.discoveryUrl` 保留为与它同源的已知发现入口。景陶新版通过 `drcomEportal: { "variant": "portal-v4", "apiPort": 801 }` 显式使用同主机 801 端口；旧 JSON 省略此配置时保留旧流程。发现功能不会自动识别所有校园网协议，也不会替你选择其他学校的服务或 RSA 公钥。v1.1.4 的更新与验收边界见 [发布说明](releases-v1.1.4.md)。
 
 ## 本地开发
 
@@ -161,7 +161,7 @@ npm test
 npm run dist:win
 ```
 
-安装程序输出到 `release/Campus-Link-Setup-1.1.4.exe`；只构建应用目录时，入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包必须在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。所有打包命令明确禁用自动上传。`dist/` 是界面构建产物，不能替代完整桌面程序。
+安装程序输出到 `release/Campus-Link-Setup-1.1.5.exe`，只构建应用目录时入口为 `release/win-unpacked/Campus Link.exe`。macOS 打包在 Mac 上运行，对应的 DMG/ZIP 也输出到 `release/`。本地打包产物与发布流程见构建说明。[构建与发布](releases.md)
 
 自动化测试使用本机模拟服务和模拟凭据，覆盖方案校验、HTTP 编码、JSONP 解析、响应判定、加密存储流程、自动连接约束等。测试不会向真实校园网提交认证或注销，也不能替代真实账号的连接验收。
 
@@ -194,8 +194,12 @@ npm run dist:win
 | `src/` | React 界面、样式及桌面 API 类型 |
 | `electron/main.cjs` | 窗口、托盘、IPC、自启动和文件对话框 |
 | `electron/service.cjs` | 设置、凭据、连接状态和方案管理 |
-| `electron/profiles.cjs` | 内置方案及外部 JSON 校验 |
+| `electron/builtin-profiles.json` | 桌面端与预览界面共用的内置方案目录 |
+| `electron/profiles.cjs` | 方案校验与导入、导出 |
+| `electron/drcom-detect.cjs` / `electron/drcom-auto.cjs` | Dr.COM 参数自动识别及受控认证 |
 | `electron/adapters.cjs` | Dr.COM 与通用 HTTP 认证适配 |
+| `electron/drcom-config.cjs` | 按学校配置执行 Dr.COM 请求 |
+| `electron/srun.cjs` | 深澜挑战应答、动态 AC 与状态复核 |
 | `electron/ruijie.cjs` | 锐捷 ePortal 入口发现、RSA 密码变换及认证状态确认 |
 | `electron/transport.cjs` | 超时、响应大小限制、JSONP 数据解析 |
 | `electron/diagnostics.cjs` | 请求诊断、敏感信息脱敏与响应正文大小限制 |

@@ -5,7 +5,9 @@ const RESERVED = new Set(['__proto__', 'prototype', 'constructor']);
 const BASE_VARIABLES = ['username', 'password', 'ip', 'mac', 'acIp', 'acName'];
 const DEFAULT_PORTAL_DISCOVERY_URL = 'http://www.msftconnecttest.com/redirect';
 const DRCOM_EPORTAL_OPERATORS = ['telecom', 'cmcc', 'unicom', 'xyw', 'raw'];
-const PROFILE_KEYS = ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'drcomEportal', 'portalDiscovery'];
+const PROFILE_KEYS = ['schemaVersion', 'id', 'name', 'description', 'version', 'author', 'homepage', 'protocol', 'timeoutMs', 'fields', 'operations', 'ruijie', 'drcomEportal', 'drcomConfig', 'srun', 'portalDiscovery'];
+const DRCOM_WIRE_KEYS = new Set(['callback', 'c', 'a', 'login_method', 'user_account', 'user_password', 'DDDDD', 'upass', '0MKKey', 'R1', 'R2', 'R3', 'R6', 'para', 'v4ip', 'v6ip', 'wlan_user_ip', 'wlan_user_ipv6', 'wlan_user_mac', 'wlan_ac_ip', 'wlan_ac_name', 'wlan_vlan_id', 'terminal_type', 'term_type', 'term_ua', 'jsVersion', 'v', 'lang', 'authex_enable', 'captcha', 'ac_logout', 'register_mode', 'program_index', 'page_index']);
+const DRCOM_WIRE_VARIABLES = new Set(['account', 'password', 'ip', 'mac', 'acIp', 'acName', 'operator', 'nonce']);
 
 function fail(message) { throw new Error(message); }
 function object(value, label) {
@@ -72,7 +74,7 @@ function validateOperation(op, name, origin, variables) {
   if (JSON.stringify(op.success) === JSON.stringify(op.failure)) fail('成功与失败判断不可相同');
 }
 function validateRuijie(value, homepage, fields) {
-  keys(value, ['discoveryUrl', 'redirectOrigins', 'publicKey', 'serviceEncoding', 'passwordWithMac', 'serviceOptional', 'valueEncoding'], 'ruijie');
+  keys(value, ['discoveryUrl', 'redirectOrigins', 'publicKey', 'publicKeySource', 'passwordMode', 'passwordEncoding', 'serviceEncoding', 'passwordWithMac', 'serviceOptional', 'valueEncoding', 'queryEncoding'], 'ruijie');
   if (value.discoveryUrl !== undefined && safeUrl(value.discoveryUrl, '锐捷发现地址').origin !== homepage.origin) fail('锐捷发现地址必须与认证页同源');
   if (value.redirectOrigins !== undefined) {
     if (!Array.isArray(value.redirectOrigins) || value.redirectOrigins.length > 8) fail('锐捷跳转来源最多 8 项');
@@ -82,26 +84,91 @@ function validateRuijie(value, homepage, fields) {
     }
     if (new Set(value.redirectOrigins).size !== value.redirectOrigins.length) fail('锐捷跳转来源不可重复');
   }
-  keys(value.publicKey, ['modulus', 'exponent'], '锐捷 RSA 公钥');
-  const { modulus, exponent } = value.publicKey;
-  // Bound input before BigInt conversion: imported files must not create expensive integers.
-  if (typeof modulus !== 'string' || modulus.length > 1024 || !/^[0-9a-f]+$/i.test(modulus)) fail('RSA 模数必须为不超过 1024 位的十六进制字符串');
-  const modulusValue = BigInt(`0x${modulus}`);
-  const bits = modulusValue.toString(2).length;
-  if (bits < 512 || bits > 4096 || modulusValue % 2n !== 1n) fail('RSA 模数必须为 512–4096 bit 的奇数');
-  if (typeof exponent !== 'string' || exponent.length > 8 || !/^[0-9a-f]+$/i.test(exponent)) fail('RSA 指数必须为不超过 8 位的十六进制字符串');
-  const exponentValue = BigInt(`0x${exponent}`);
-  if (exponentValue < 3n || exponentValue > 0xffffffffn || exponentValue % 2n !== 1n) fail('RSA 指数必须为 3–0xffffffff 的奇数');
+  if (value.publicKeySource !== undefined && !['static', 'page-info'].includes(value.publicKeySource)) fail('publicKeySource 必须为 static 或 page-info');
+  if (value.passwordMode !== undefined && !['rsa', 'plain'].includes(value.passwordMode)) fail('passwordMode 必须为 rsa 或 plain');
+  if (value.passwordEncoding !== undefined && !['legacy', 'utf8'].includes(value.passwordEncoding)) fail('passwordEncoding 必须为 legacy 或 utf8');
+  if (value.passwordMode === 'plain' && (['publicKey', 'publicKeySource', 'passwordEncoding'].some(key => Object.hasOwn(value, key)) || value.passwordWithMac === true)) fail('明文锐捷方案不使用 RSA 公钥或密码变换配置');
+  if (value.publicKeySource === 'page-info' && Object.hasOwn(value, 'publicKey')) fail('动态公钥方案不可同时声明静态 publicKey');
+  if (value.passwordMode !== 'plain' && value.publicKeySource !== 'page-info') {
+    keys(value.publicKey, ['modulus', 'exponent'], '锐捷 RSA 公钥');
+    const { modulus, exponent } = value.publicKey;
+    // Bound input before BigInt conversion: imported files must not create expensive integers.
+    if (typeof modulus !== 'string' || modulus.length > 1024 || !/^[0-9a-f]+$/i.test(modulus)) fail('RSA 模数必须为不超过 1024 位的十六进制字符串');
+    const modulusValue = BigInt(`0x${modulus}`);
+    const bits = modulusValue.toString(2).length;
+    if (bits < 512 || bits > 4096 || modulusValue % 2n !== 1n) fail('RSA 模数必须为 512–4096 bit 的奇数');
+    if (typeof exponent !== 'string' || exponent.length > 8 || !/^[0-9a-f]+$/i.test(exponent)) fail('RSA 指数必须为不超过 8 位的十六进制字符串');
+    const exponentValue = BigInt(`0x${exponent}`);
+    if (exponentValue < 3n || exponentValue > 0xffffffffn || exponentValue % 2n !== 1n) fail('RSA 指数必须为 3–0xffffffff 的奇数');
+  }
   if (value.serviceEncoding !== undefined && !['plain', 'percent'].includes(value.serviceEncoding)) fail('serviceEncoding 必须为 plain 或 percent');
   if (value.passwordWithMac !== undefined && typeof value.passwordWithMac !== 'boolean') fail('passwordWithMac 必须为布尔值');
   if (value.serviceOptional !== undefined && typeof value.serviceOptional !== 'boolean') fail('serviceOptional 必须为布尔值');
   if (value.valueEncoding !== undefined && !['plain', 'percent'].includes(value.valueEncoding)) fail('valueEncoding 必须为 plain 或 percent');
+  if (value.queryEncoding !== undefined && !['plain', 'percent', 'jmu', 'upc'].includes(value.queryEncoding)) fail('queryEncoding 必须为 plain / percent / jmu / upc');
   const service = fields?.find(field => field.key === 'service');
   if (value.serviceOptional === true) {
     if (service?.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
   } else {
     if (!service || (service.default === undefined && !service.options)) fail('锐捷方案必须声明 service 字符串字段，并提供默认值或选项');
     if ((service.default !== undefined && !service.default.trim()) || service.options?.some(option => !option.value.trim())) fail('锐捷服务名称不得为空');
+  }
+}
+function validateWireFields(fields, label, operation = 'login') {
+  if (!Array.isArray(fields) || fields.length > 50) fail(`${label} 必须是最多 50 项的参数数组`);
+  for (const field of fields) {
+    keys(field, ['key', 'value'], label);
+    if (!DRCOM_WIRE_KEYS.has(field.key)) fail(`${label} 包含不支持的参数`);
+    validateTemplate(field.value, DRCOM_WIRE_VARIABLES, label);
+    if (/[\u0000-\u001f\u007f]/.test(field.value)) fail(`${label} 包含无效控制字符`);
+    if (field.key === 'c' && field.value !== 'Portal' || field.key === 'a' && field.value.toLowerCase() !== operation) fail('Dr.COM 操作参数与请求类型不一致');
+    if (field.value.includes('{{password}}') && (operation !== 'login' || !['upass', 'user_password'].includes(field.key))) fail('密码只可用于登录密码字段');
+    if (field.value.includes('{{account}}') && (operation !== 'login' || !['DDDDD', 'user_account'].includes(field.key))) fail('账号只可用于登录账号字段');
+    if (operation !== 'login' && ['DDDDD', 'upass', 'user_account', 'user_password'].includes(field.key)) fail('状态与注销参数不发送账号密码');
+    if (operation === 'status') {
+      if (!['callback', 'jsVersion', 'v', 'lang'].includes(field.key)) fail('Dr.COM 状态查询仅支持元数据参数');
+      validateTemplate(field.value, new Set(['nonce']), label);
+    }
+  }
+}
+function validateDrcomConfig(value) {
+  keys(value, ['mode', 'apiPort', 'accountPrefix', 'jsVersion', 'operatorMode', 'operators', 'defaultOperator', 'loginFields', 'requireIp', 'macMode', 'statusMode', 'statusFields', 'logoutMode', 'logoutFields'], 'Dr.COM 学校参数');
+  if (!['web', 'legacy', 'v4'].includes(value.mode)) fail('Dr.COM 认证方式无效');
+  if (!Number.isInteger(value.apiPort) || value.apiPort < 1 || value.apiPort > 65535) fail('Dr.COM 接口端口无效');
+  if (typeof value.accountPrefix !== 'string' || !/^(?:,[a-z0-9],)?$/i.test(value.accountPrefix)) fail('Dr.COM 账号前缀无效');
+  if (typeof value.jsVersion !== 'string' || !/^[a-z0-9._-]{1,32}$/i.test(value.jsVersion)) fail('Dr.COM 状态协议版本无效');
+  if (!['suffix', 'r3', 'none'].includes(value.operatorMode)) fail('Dr.COM 服务类型无效');
+  if (!Array.isArray(value.operators) || value.operators.length > 20) fail('Dr.COM 服务最多 20 项');
+  const seen = new Set();
+  for (const operator of value.operators) {
+    keys(operator, ['label', 'value'], 'Dr.COM 服务');
+    string(operator.label, '服务名称', 80);
+    if (typeof operator.value !== 'string' || operator.value.length > 100 || /[\u0000-\u0020]/.test(operator.value) || seen.has(operator.value)) fail('Dr.COM 服务值无效或重复');
+    if (value.operatorMode === 'suffix' && operator.value && !/^@[a-z0-9._-]{1,80}$/i.test(operator.value)) fail('Dr.COM 账号后缀无效');
+    seen.add(operator.value);
+  }
+  if (value.defaultOperator !== null && (typeof value.defaultOperator !== 'string' || value.operatorMode !== 'none' && !seen.has(value.defaultOperator))) fail('Dr.COM 默认服务无效');
+  if (typeof value.requireIp !== 'boolean' || !['zero', 'portal'].includes(value.macMode) || !['result', 'identity'].includes(value.statusMode) || !['drcom', 'v4', 'legacy'].includes(value.logoutMode)) fail('Dr.COM 设备或状态设置无效');
+  validateWireFields(value.loginFields, 'Dr.COM 登录参数');
+  const accountKey = value.mode === 'web' ? 'DDDDD' : 'user_account';
+  const passwordKey = value.mode === 'web' ? 'upass' : 'user_password';
+  for (const [key, template] of [[accountKey, '{{account}}'], [passwordKey, '{{password}}']]) {
+    const matches = value.loginFields.filter(field => field.key === key);
+    if (matches.length !== 1 || matches[0].value !== template) fail('Dr.COM 登录须明确包含账号与密码模板');
+  }
+  if (value.logoutFields !== undefined) validateWireFields(value.logoutFields, 'Dr.COM 注销参数', 'logout');
+  if (value.statusFields !== undefined) validateWireFields(value.statusFields, 'Dr.COM 状态参数', 'status');
+}
+function validateSrun(value, fields) {
+  keys(value, ['acId', 'hmacMode', 'usernameSuffix'], '深澜配置');
+  if (value.acId !== 'auto' && (typeof value.acId !== 'string' || !/^\d{1,6}$/.test(value.acId))) fail('深澜 acId 必须为数字字符串或 auto');
+  if (!['empty', 'password'].includes(value.hmacMode)) fail('深澜 hmacMode 必须为 empty 或 password');
+  if (value.usernameSuffix !== undefined && (typeof value.usernameSuffix !== 'string' || !/^@[a-z0-9._-]{1,80}$/i.test(value.usernameSuffix))) fail('深澜账号后缀无效');
+  const suffix = fields?.find(field => field.key === 'suffix');
+  if (suffix) {
+    const values = [suffix.default, ...(suffix.options || []).map(option => option.value)].filter(item => item !== undefined);
+    if (!values.length || values.some(item => item !== '' && !/^@[a-z0-9._-]{1,80}$/i.test(item))) fail('深澜服务后缀无效');
+    if (value.usernameSuffix !== undefined) fail('深澜固定后缀与服务后缀只可设置一种');
   }
 }
 function validateProfile(value, { builtin = false } = {}) {
@@ -114,16 +181,19 @@ function validateProfile(value, { builtin = false } = {}) {
   string(value.version, '版本', 32);
   string(value.author, '作者', 80, true);
   const homepage = safeUrl(value.homepage, '认证页地址');
-  if (!['drcom', 'http', 'ruijie', 'drcom-eportal'].includes(value.protocol)) fail('protocol 仅支持 drcom / http / ruijie / drcom-eportal');
+  if (!['drcom', 'http', 'ruijie', 'drcom-eportal', 'drcom-auto', 'drcom-config', 'srun', 'sangfor'].includes(value.protocol)) fail('protocol 不在支持的认证类型之中');
+  if (value.protocol !== 'drcom-config' && Object.hasOwn(value, 'drcomConfig')) fail('仅 Dr.COM 学校方案可声明 drcomConfig');
+  if (value.protocol !== 'srun' && Object.hasOwn(value, 'srun')) fail('仅深澜方案可声明 srun');
   if (value.protocol !== 'ruijie' && Object.hasOwn(value, 'ruijie')) fail('仅锐捷方案可声明 ruijie 配置');
   if (Object.hasOwn(value, 'drcomEportal')) {
     if (value.protocol !== 'drcom-eportal') fail('仅 Dr.COM ePortal 方案可声明 drcomEportal 配置');
-    keys(value.drcomEportal, ['variant', 'apiPort'], 'drcomEportal');
+    keys(value.drcomEportal, ['variant', 'apiPort', 'dialect'], 'drcomEportal');
     if (value.drcomEportal.variant !== 'portal-v4') fail('drcomEportal.variant 必须为 portal-v4');
     if (!Number.isInteger(value.drcomEportal.apiPort) || value.drcomEportal.apiPort < 1 || value.drcomEportal.apiPort > 65535) fail('drcomEportal.apiPort 必须为 1–65535 的整数');
+    if (value.drcomEportal.dialect !== undefined && value.drcomEportal.dialect !== 'cqu') fail('drcomEportal.dialect 仅支持 cqu');
   }
   if (Object.hasOwn(value, 'portalDiscovery')) {
-    if (!['drcom', 'ruijie', 'drcom-eportal'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie / drcom-eportal 方案');
+    if (!['drcom', 'ruijie', 'drcom-eportal', 'drcom-auto', 'drcom-config'].includes(value.protocol)) fail('portalDiscovery 仅支持 drcom / ruijie / drcom-eportal / drcom-auto / drcom-config 方案');
     keys(value.portalDiscovery, ['url'], '认证页自动发现');
     safeUrl(value.portalDiscovery.url, '认证页发现地址');
   }
@@ -154,7 +224,7 @@ function validateProfile(value, { builtin = false } = {}) {
     keys(value.operations, ['login', 'logout', 'status'], 'operations');
     for (const name of ['login', 'logout', 'status']) if (!value.operations[name]) fail(`缺少 ${name} 请求；v1 方案须完整提供登录、注销与只读状态查询`);
     for (const name of Object.keys(value.operations)) validateOperation(value.operations[name], name, homepage.origin, variables);
-  } else if (Object.hasOwn(value, 'operations')) fail('drcom / ruijie / drcom-eportal 方案不允许覆写 operations 请求');
+  } else if (Object.hasOwn(value, 'operations')) fail('drcom / ruijie / drcom-eportal / drcom-auto 方案不允许覆写 operations 请求');
   if (value.protocol === 'drcom') {
     const operator = value.fields?.find(field => field.key === 'operator');
     if (operator) {
@@ -164,8 +234,11 @@ function validateProfile(value, { builtin = false } = {}) {
     }
   }
   if (value.protocol === 'ruijie') validateRuijie(value.ruijie, homepage, value.fields);
+  if (value.protocol === 'drcom-config') validateDrcomConfig(value.drcomConfig);
+  if (value.protocol === 'srun') validateSrun(value.srun, value.fields);
   if (value.drcomEportal?.variant === 'portal-v4') {
     const operator = value.fields?.find(field => field.key === 'operator');
+    if (value.drcomEportal.dialect === 'cqu' && operator) fail('重庆大学方案使用完整账号，不支持 operator 字段');
     if (operator) {
       if (operator.default === undefined && !operator.options) fail('Dr.COM ePortal operator 字段须提供默认值或选项');
       const values = [operator.default, ...(operator.options || []).map(option => option.value)].filter(item => item !== undefined);
@@ -225,83 +298,8 @@ function profileParameters(profile, input = {}) {
   return result;
 }
 
-const builtinProfile = validateProfile({
-  schemaVersion: 1,
-  id: 'builtin-gzqy',
-  name: '贵州轻工职业大学',
-  description: '内置 Dr.COM 校园网认证 · 请先连接校园 Wi-Fi 或有线网络',
-  version: '1.0.0', author: 'NingMeng123', homepage: 'http://10.151.253.10/',
-  protocol: 'drcom', timeoutMs: 10000,
-  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
-  fields: [{ key: 'operator', label: '网络类型', default: '1', options: [{ label: '校园网', value: '1' }] }],
-}, { builtin: true });
-
-const builtinRuijieProfile = validateProfile({
-  schemaVersion: 1,
-  id: 'builtin-scu-ruijie',
-  name: '四川大学 · 锐捷 ePortal',
-  description: '参考四川大学锐捷 ePortal 认证流程；请先连接对应校园网络，并选择账号开通的服务。其他学校请导入匹配的锐捷方案。',
-  version: '1.0.0', author: 'NingMeng123', homepage: 'http://192.168.2.135/',
-  protocol: 'ruijie', timeoutMs: 10000,
-  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
-  fields: [{ key: 'service', label: '网络服务', default: 'internet', options: [
-    { label: '校园网（internet）', value: 'internet' },
-    { label: '电信出口', value: '电信出口' },
-    { label: '移动出口', value: '移动出口' },
-    { label: '联通出口', value: '联通出口' },
-  ] }],
-  ruijie: {
-    discoveryUrl: 'http://192.168.2.135/',
-    redirectOrigins: ['http://123.123.123.123'],
-    publicKey: {
-      modulus: '94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871',
-      exponent: '10001',
-    },
-    serviceEncoding: 'percent',
-  },
-}, { builtin: true });
-
-// Verified 2026-10-16 against a real capture and the live portal of
-// 成都理工大学（宜宾校区）: same default 1024-bit Ruijie RSA key and the same
-// `password>mac` RSA input as SCU, but the portal submits an empty service
-// and double-encodes the account and query string in the login form.
-const builtinCdutYibinProfile = validateProfile({
-  schemaVersion: 1,
-  id: 'builtin-cdut-yibin-ruijie',
-  name: '成都理工大学（宜宾校区）· 锐捷 ePortal',
-  description: '成都理工大学宜宾校区锐捷 ePortal 认证（2026-10-16 依据真实抓包核验）；请先连接 CDUTYB-WEB 无线或校园有线网络。登录不选择网络服务，使用学校统一认证账号。',
-  version: '1.0.0', author: 'NingMeng123', homepage: 'http://10.26.30.253/',
-  protocol: 'ruijie', timeoutMs: 10000,
-  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
-  ruijie: {
-    discoveryUrl: 'http://10.26.30.253/',
-    redirectOrigins: [],
-    publicKey: {
-      modulus: '94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871',
-      exponent: '10001',
-    },
-    serviceOptional: true,
-    valueEncoding: 'percent',
-  },
-}, { builtin: true });
-
-const builtinJdztcProfile = validateProfile({
-  schemaVersion: 1,
-  id: 'builtin-jdztc',
-  name: '景德镇陶瓷大学 · Dr.COM ePortal',
-  description: '依据真实网页选项和电信请求适配 Dr.COM ePortal；先连接 JCU、JCI 等校园网络，选择对应运营商，填写学号和云陶密码。已有匹配后缀不会重复添加，完整账号模式保留输入；校内成功认证仍需验证。',
-  version: '1.1.0', author: 'NingMeng123', homepage: 'http://172.29.0.2/a79.htm',
-  protocol: 'drcom-eportal', timeoutMs: 10000,
-  drcomEportal: { variant: 'portal-v4', apiPort: 801 },
-  fields: [{ key: 'operator', label: '运营商', default: 'telecom', options: [
-    { label: '中国电信', value: 'telecom' },
-    { label: '中国移动', value: 'cmcc' },
-    { label: '中国联通', value: 'unicom' },
-    { label: '测试', value: 'xyw' },
-    { label: '其他（使用完整账号）', value: 'raw' },
-  ] }],
-  portalDiscovery: { url: DEFAULT_PORTAL_DISCOVERY_URL },
-}, { builtin: true });
-
-const builtinProfiles = [builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinJdztcProfile];
+// NingMeng123 — one declarative catalog for desktop and browser preview.
+const builtinProfiles = require('./builtin-profiles.json').map(profile => validateProfile(profile, { builtin: true }));
+if (new Set(builtinProfiles.map(profile => profile.id)).size !== builtinProfiles.length) fail('内置方案 ID 不可重复');
+const [builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinJdztcProfile] = builtinProfiles;
 module.exports = { MAX_PROFILE_BYTES, BASE_VARIABLES, DEFAULT_PORTAL_DISCOVERY_URL, builtinProfile, builtinRuijieProfile, builtinCdutYibinProfile, builtinJdztcProfile, builtinProfiles, validateProfile, parseProfile, publicProfile, exportProfile, exportProfileJson, profileParameters, safeUrl, keys };

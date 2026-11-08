@@ -1,6 +1,6 @@
 # 外部连接方案指南
 
-岚连的外部扩展是声明式 JSON 配置，支持固定 GET/POST 接口的 `http` 方案，以及使用受控适配器的 `drcom`、`drcom-eportal` 和 `ruijie` 方案。当前版本不加载任意脚本，也没有运行第三方代码的插件接口。
+岚连的外部扩展是声明式 JSON 配置，支持固定 GET/POST 接口的 `http` 方案，以及使用受控适配器的 `drcom`、`drcom-eportal`、`drcom-auto`、`drcom-config`、`srun` 和 `ruijie` 方案。当前版本不加载任意脚本，也没有运行第三方代码的插件接口。
 
 本指南的请求模板、操作定义与响应规则适用于 `http`。Dr.COM 和锐捷方案不配置 `operations`，使用应用固定的认证流程；锐捷请同时阅读 [锐捷校园网方案制作教程](ruijie-guide.md)，按实际认证页配置发现入口、跳转源、公钥和服务。景陶的 Dr.COM ePortal 配置见 [景陶接入说明](jdztc-guide.md)，与锐捷的同名 ePortal 产品使用不同协议。
 
@@ -30,6 +30,16 @@
 可保留 `portalDiscovery` 自动发现当前网络认证入口；`homepage` 是发现失败时的已知回退地址。若声明 `fields` 中的 `operator` 字段，必须提供非空单行字符串默认值或选项，它会作为 `R3` 参数发送；不声明时适配器使用 `1`。不要自行猜测运营商编号、账号后缀或服务值。只适用于协议与现有适配器一致的 Dr.COM Web 部署，其他请求参数、签名或认证流程需要修改并测试主程序适配器。
 
 `drcom-eportal` 支持旧流程和新版 `portal-v4` 流程。没有 `drcomEportal` 配置的旧 JSON 保留 GET `/eportal/?c=Portal&a=login`、原始账号及兼容接口行为，不自动修改用户导入的定义。景陶内置方案和 [景陶示例](../examples/jdztc-campus.example.json) 使用 `drcomEportal: { "variant": "portal-v4", "apiPort": 801 }`：认证页保留 HTTP 80 端口，登录改为同主机 801 端口的 `/eportal/portal/login`，账号字段为 `,0,完整账号`，密码按原值 URL 编码。`operator` 的 `telecom`、`cmcc`、`unicom`、`xyw` 分别对应网页确认的 `@telecom`、`@cmcc`、`@unicom`、`@xyw`；`xyw` 的网页原名是“测试”，不另称校园网。默认电信，正确后缀不重复追加；`raw`（其他）按输入的完整账号提交。新版状态保留 80 端口只读查询及严格页面回退，兼容注销使用 801 端口 `/eportal/portal/logout`，操作后均独立复核。它不使用 `/drcom/login` 或锐捷 RSA 配置，详细证据和验证范围见 [景陶接入说明](jdztc-guide.md)。
+
+## 自动识别与新增高校配置
+
+`drcom-auto` 使用通用示例，由应用在每次操作中读取当前门户参数，不配置 `operations`。`fields` 中的 `portalUrl`、`apiPort` 可留空，`accountPrefix` 默认为 `auto`（`none` 表示无前缀）。`operator` 支持 `auto` / `raw` / `campus` / `office` / `telecom` / `cmcc` / `unicom`，其中 `office` 按当前页面的办公网标签选择服务。未知加密或复杂分支会给出具体提示。[通用示例](../examples/drcom-auto.example.json) · [Dr.COM 自动识别](drcom-auto-guide.md)
+
+重庆大学通过 `drcomEportal.dialect: "cqu"` 显式选择其状态和电脑端参数，不声明 `operator`。西南大学使用 `ruijie.publicKeySource: "page-info"` 与 `passwordEncoding: "utf8"`，每次登录获取同源动态公钥；此模式不允许同时设置静态 `publicKey`。原有静态方案省略这两个字段即可保持原行为；显式静态值分别为 `static` 和 `legacy`。详见 [高校接入记录](university-adapters.md)。
+
+## 深信服 Portal 配置
+
+贵州师范大学使用 `protocol: "sangfor"`。可导出该校方案，按学校当前门户修改 `homepage`，保留可选的 `portalUrl` 字段。固定流程包含 `/ac_portal/login.php` 的 `pwdLogin`、`/homepage/info.php` 的只读 `opr=list` 查询，以及 `/homepage/logout` 注销。客户端生成当前时间戳和 RC4 密码参数，维护操作内的同源 Cookie，并独立确认登录与注销后的状态。适用范围限于这代深信服账号密码门户。[贵州接入记录](university-adapters.md#贵州高校复核与接入)
 
 ## 完整示例
 
@@ -103,17 +113,19 @@
 | `version` | 是 | 版本字符串，最多 32 字符，例如 `1.0.0` |
 | `author` | 否 | 作者，最多 80 字符 |
 | `homepage` | 是 | 已知认证页 URL，必须使用 HTTP 或 HTTPS；开启网络入口发现时作为回退入口 |
-| `protocol` | 是 | `http`、`drcom`、`drcom-eportal` 或 `ruijie`；后三者使用受控适配器 |
+| `protocol` | 是 | `http`、`drcom`、`drcom-eportal`、`drcom-auto`、`drcom-config`、`srun` 或 `ruijie`，后六者使用受控适配器 |
 | `timeoutMs` | 否 | 单次请求超时，整数 1000–30000 毫秒；默认 10000 |
 | `fields` | HTTP / Dr.COM 可选 | 界面上的额外输入项，最多 12 项；Dr.COM 若声明 `operator` 须有非空默认值或选项；锐捷必须声明有非空默认值或选项的 `service` 字段 |
-| `operations` | HTTP 必填 | `http` 必须完整提供 `login`、`logout`、`status`；`drcom` / `drcom-eportal` / `ruijie` 禁止设置此字段 |
+| `operations` | HTTP 必填 | `http` 必须完整提供 `login`、`logout`、`status`；`drcom` / `drcom-eportal` / `drcom-auto` / `drcom-config` / `srun` / `ruijie` 禁止设置此字段 |
 | `ruijie` | 锐捷必填 | 仅 `ruijie` 使用的发现与加密配置，详见 [锐捷教程](ruijie-guide.md) |
 | `drcomEportal` | 否 | 仅 `drcom-eportal` 使用；`{ "variant": "portal-v4", "apiPort": 801 }` 开启新版端口与接口流程；省略时保留旧流程 |
-| `portalDiscovery` | 否 | 仅 `drcom` / `drcom-eportal` / `ruijie` 支持；形如 `{ "url": "http://www.msftconnecttest.com/redirect" }`，开启只读网络入口发现 |
+| `drcomConfig` | 学校参数型 Dr.COM 必填 | 仅 `drcom-config` 使用，包含有序登录字段、账号前缀、运营商和固定接口方式 |
+| `srun` | 深澜必填 | `acId` 为数字字符串或 `auto`，`hmacMode` 为 `empty` 或 `password`，可选固定 `usernameSuffix` |
+| `portalDiscovery` | 否 | 仅 `drcom` / `drcom-eportal` / `drcom-auto` / `ruijie` 支持；形如 `{ "url": "http://www.msftconnecttest.com/redirect" }`，开启只读网络入口发现 |
 
 不接受未声明的额外属性。配置中的 URL 必须为固定字符串，不能包含用户名密码、片段 `#...` 或模板变量。HTTP 方案所有操作的 URL 必须与 `homepage` **同源**，即协议、主机、端口完全相同；不同路径可以使用。认证页在端口 80、接口在端口 801 的通用 HTTP 方案不能以这两个地址直接组合通过校验。
 
-锐捷方案的已知发现入口仍与 `homepage` 同源，发现链的中转来源由 `redirectOrigins` 声明。可选 `portalDiscovery` 则先从当前网络的只读探测响应识别真实门户来源；识别成功后使用该来源进行认证，未识别时回退已知入口。它支持内置及外部 `drcom` / `drcom-eportal` / `ruijie`，不支持通用 `http`。
+锐捷方案的已知发现入口仍与 `homepage` 同源，发现链的中转来源由 `redirectOrigins` 声明。可选 `portalDiscovery` 则先从当前网络的只读探测响应识别真实门户来源；识别成功后使用该来源进行认证，未识别时回退已知入口。它支持内置及外部 `drcom` / `drcom-eportal` / `drcom-auto` / `ruijie`，不支持通用 `http`。
 
 内置方案、锐捷示例与景陶示例默认使用 `http://www.msftconnecttest.com/redirect`。该地址只是探测入口，正常 MSN/Bing 跳转不是校园网成功信号，账号密码不会被提交给 Microsoft。应用只在运行期间复用已识别的服务器来源，不持久保存发现出的 `queryString`、MAC 或其他临时参数。完整配置与抓包步骤见 [锐捷教程](ruijie-guide.md#3-找到认证服务器与发现入口)。
 
@@ -223,3 +235,13 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 | 响应未匹配成功或失败规则 | 对照实际响应结构、字段类型和明确状态标记调整规则 |
 
 分享方案时只包含服务器地址和协议结构，不包含任何个人账号、密码、Cookie、token、客户端 IP/MAC 或私有页面副本。
+
+## 学校参数型 Dr.COM 与深澜
+
+新增 20 校使用已经核对的协议配置，可直接从对应内置卡片导出。完整来源与范围见高校接入记录。[20 校清单](university-adapters.md#本次新增-20-所大学)
+
+`drcom-config` 使用 `drcomConfig` 声明 `mode`、`apiPort`、`accountPrefix`、`jsVersion`、`operatorMode`、`operators`、`defaultOperator`、`requireIp`、`macMode`、`statusMode`、`logoutMode` 和 `loginFields`。`mode` 只支持 `web`、`legacy`、`v4`。字段数组每项为 `{ "key": "参数名", "value": "值" }`，保持顺序和重复项。模板只支持 `account`、`password`、`ip`、`mac`、`acIp`、`acName`、`operator`、`nonce`。密码只用于登录密码字段。账号由前缀和服务后缀组合后填入 `account`。状态参数可选 `statusFields`，仅支持回调、版本、随机数、语言，不包含凭据。注销参数可选 `logoutFields`。
+
+深澜示例配置为 `srun: { "acId": "1", "hmacMode": "password" }`。`acId: "auto"` 从同源认证入口读取，无法确认时提示填写实际校区值。`hmacMode` 必须按学校源码选择。可选固定 `usernameSuffix`，或声明 `fields` 中的 `suffix` 下拉选项，两者只设置一种。空后缀选项用于完整账号，已有匹配后缀保持输入。
+
+锐捷明文门户显式声明 `passwordMode: "plain"`，不填写 RSA 公钥或密码变换配置。`queryEncoding` 可独立设为 `plain`、`percent`、`jmu` 或 `upc`。后两者仅用于已核对的集美大学和中国石油大学（华东）查询格式。其他学校应按实际门户选择。

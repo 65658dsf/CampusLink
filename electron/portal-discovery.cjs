@@ -24,8 +24,11 @@ function safeTarget(value, base, { formOriginOnly = false } = {}) {
   try { pathname = decodeURIComponent(url.pathname); } catch { return null; }
   // Some Dr.COM actions use GET. Discovery must never execute them, even
   // when the redirect carries no account or password.
-  if (!formOriginOnly && (/^\/(?:drcom\/(?:login|logout)|eportal\/portal\/(?:login|logout)|F\.htm)\/?$/i.test(pathname) ||
-      (/^\/eportal\/?$/i.test(pathname) && /^(?:login|logout)$/i.test(url.searchParams.get('a') || '')))) return null;
+  if (!formOriginOnly && (
+    /^\/(?:drcom\/(?:login|logout)|F\.htm)\/?$/i.test(pathname) ||
+    /^\/eportal\/portal\//i.test(pathname) && !/^\/eportal\/portal\/page\/loadConfig\/?$/i.test(pathname) ||
+    [...url.searchParams].some(([key, val]) => /^(?:a|action|method)$/i.test(key) && /^(?:login|logout|logoff|disconnect|bind|unbind|kick|delete|remove)$/i.test(val))
+  )) return null;
   // Discovery never sends account credentials, even if a redirect contains
   // them. Do not silently turn an authenticated URL into an apparent probe.
   for (const [key] of url.searchParams) if (CREDENTIAL_KEY.test(key.replace(/[^a-z0-9]/gi, ''))) return null;
@@ -42,7 +45,8 @@ function protocolOf(url, body) {
   // JCU's a79 landing page uses the older Dr.COM ePortal JSONP login,
   // which is distinct from both /drcom/login and Ruijie's JSP ePortal.
   const eportalApi = /\/eportal\/\?[^"'<>\s]*\bc=Portal(?:&(?:amp;)?|%26)a=login\b/i.test(body);
-  const drcomEportal = htmlDocument && (drcomMarker || loginForm) && (/^\/a79\.htm$/i.test(url.pathname) || eportalApi);
+  const eportalV4Api = /\/eportal\/portal\/login(?:[?"'\s]|$)/i.test(body);
+  const drcomEportal = htmlDocument && (drcomMarker || loginForm) && (/^\/a79\.htm$/i.test(url.pathname) || eportalApi || eportalV4Api);
   const eportalPath = /^\/eportal\/(?:index|success|redirectortosuccess)\.jsp$/i.test(url.pathname);
   const mac = url.searchParams.get('mac') || '';
   // SCU calls its 32-digit opaque device identifier "mac" as well. Preserve

@@ -1,0 +1,690 @@
+{
+  "researchedAt": "2026-11-08",
+  "developer": "NingMeng123",
+  "verification": "源码对照与本地模拟，待校内实测",
+  "schools": [
+    {
+      "id": "builtin-hnust",
+      "school": "湖南科技大学",
+      "protocol": "drcom-config",
+      "campus": "未细分校区",
+      "sources": [
+        {
+          "repository": "dezige131/hnust-drcom-auth",
+          "commit": "adec498fdf1ad932e138a4bcb5ccaaadbce651d8",
+          "path": "luci-app-campus-auth/root/usr/bin/campus-auth",
+          "url": "https://github.com/dezige131/hnust-drcom-auth/blob/adec498fdf1ad932e138a4bcb5ccaaadbce651d8/luci-app-campus-auth/root/usr/bin/campus-auth"
+        },
+        {
+          "repository": "dezige131/hnust-drcom-auth",
+          "commit": "adec498fdf1ad932e138a4bcb5ccaaadbce651d8",
+          "path": "README.md",
+          "url": "https://github.com/dezige131/hnust-drcom-auth/blob/adec498fdf1ad932e138a4bcb5ccaaadbce651d8/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "protocol-compatible",
+        "logout": "protocol-compatible"
+      },
+      "notes": [
+        "上游只有login/check操作，状态与注销按协议兼容实现，校内待验证",
+        "电脑端使用,0,前缀，不采用手机端,1,"
+      ]
+    },
+    {
+      "id": "builtin-szu",
+      "school": "深圳大学",
+      "protocol": "drcom-config",
+      "campus": "未细分校区",
+      "sources": [
+        {
+          "repository": "CollinChan002/SZU-Drcom",
+          "commit": "cca5354b3d5af7ab3b1dd7088a90d75b95999865",
+          "path": "drcom.sh",
+          "url": "https://github.com/CollinChan002/SZU-Drcom/blob/cca5354b3d5af7ab3b1dd7088a90d75b95999865/drcom.sh"
+        },
+        {
+          "repository": "CollinChan002/SZU-Drcom",
+          "commit": "cca5354b3d5af7ab3b1dd7088a90d75b95999865",
+          "path": "README.md",
+          "url": "https://github.com/CollinChan002/SZU-Drcom/blob/cca5354b3d5af7ab3b1dd7088a90d75b95999865/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "protocol-compatible",
+        "logout": "protocol-compatible"
+      },
+      "notes": [
+        "上游登录只包含4个字段，不要求客户端IP/MAC或jsVersion",
+        "上游未记录状态与注销wire，按协议兼容实现，校内待验证",
+        "此处,1,是源脚本实际固定值，不根据桌面终端改写为,0,"
+      ]
+    },
+    {
+      "id": "builtin-yau",
+      "school": "延安大学",
+      "protocol": "drcom-config",
+      "campus": "未细分校区",
+      "sources": [
+        {
+          "repository": "liar-ac/YAU-AutoNet-Connect",
+          "commit": "f28f880bbf022289da0dcb198681b67f3de43978",
+          "path": "campus_auto_login.py",
+          "url": "https://github.com/liar-ac/YAU-AutoNet-Connect/blob/f28f880bbf022289da0dcb198681b67f3de43978/campus_auto_login.py"
+        },
+        {
+          "repository": "liar-ac/YAU-AutoNet-Connect",
+          "commit": "f28f880bbf022289da0dcb198681b67f3de43978",
+          "path": "README.md",
+          "url": "https://github.com/liar-ac/YAU-AutoNet-Connect/blob/f28f880bbf022289da0dcb198681b67f3de43978/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "source",
+        "logout": "protocol-compatible"
+      },
+      "notes": [
+        "上游登录helper强制去掉业务lang，只发送结尾lang=zh",
+        "运营商后缀@dx/@lt来自init_config提示，默认空；其余运营商使用完整账号",
+        "上游未记录注销wire，兼容注销待校内验证"
+      ]
+    },
+    {
+      "id": "builtin-nufe",
+      "school": "南京财经大学",
+      "protocol": "drcom-config",
+      "campus": "NUFE-STU",
+      "sources": [
+        {
+          "repository": "Halcyonjoy/nufe-network-assistant",
+          "commit": "d563585fb6861ab36b57c43ccfbe488cea7815da",
+          "path": "src/NufeCampus.Windows/CampusPortal.cs",
+          "url": "https://github.com/Halcyonjoy/nufe-network-assistant/blob/d563585fb6861ab36b57c43ccfbe488cea7815da/src/NufeCampus.Windows/CampusPortal.cs"
+        },
+        {
+          "repository": "Halcyonjoy/nufe-network-assistant",
+          "commit": "d563585fb6861ab36b57c43ccfbe488cea7815da",
+          "path": "README.md",
+          "url": "https://github.com/Halcyonjoy/nufe-network-assistant/blob/d563585fb6861ab36b57c43ccfbe488cea7815da/README.md"
+        },
+        {
+          "repository": "SLULUL/nufe_nampus_network_login",
+          "commit": "50ab901e27112299cf3fca8eaec979cacce43a8b",
+          "path": "xywlogin.py",
+          "url": "https://github.com/SLULUL/nufe_nampus_network_login/blob/50ab901e27112299cf3fca8eaec979cacce43a8b/xywlogin.py"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "source",
+        "logout": "source"
+      },
+      "notes": [
+        "上游只允许移动@cmcc和电信@njxy，未采用旧仓库不明确的校园无后缀模式",
+        "仅协议事实独立实现，不复制上游Wifi绑定/自动操作其它账号逻辑"
+      ]
+    },
+    {
+      "id": "builtin-seu",
+      "school": "东南大学",
+      "protocol": "drcom-config",
+      "campus": "seu-wlan",
+      "sources": [
+        {
+          "repository": "NN708/seu-wlan-login",
+          "commit": "f4bca31916ebcfda1cad61923906c319c1009f89",
+          "path": "Python/login.py",
+          "url": "https://github.com/NN708/seu-wlan-login/blob/f4bca31916ebcfda1cad61923906c319c1009f89/Python/login.py"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "source",
+        "logout": "protocol-compatible"
+      },
+      "notes": [
+        "旧版HTTPS 801接口，不能改成新版/portal/login或HTTP",
+        "上游只记录登录与状态，注销为兼容流程，校内待验证",
+        "错误msg可能Base64，响应判断仍必须使用result，不能把解码错误当成功"
+      ]
+    },
+    {
+      "id": "builtin-cpu",
+      "school": "中国药科大学",
+      "protocol": "drcom-config",
+      "campus": "CPU校园网模式",
+      "sources": [
+        {
+          "repository": "SoraNoNeko/cpu_net",
+          "commit": "2a2a148bf025fd026cdd6de153567c4d6dd3dd30",
+          "path": "src/Core/Constants/NetworkConstants.cs",
+          "url": "https://github.com/SoraNoNeko/cpu_net/blob/2a2a148bf025fd026cdd6de153567c4d6dd3dd30/src/Core/Constants/NetworkConstants.cs"
+        },
+        {
+          "repository": "SoraNoNeko/cpu_net",
+          "commit": "2a2a148bf025fd026cdd6de153567c4d6dd3dd30",
+          "path": "src/ViewModels/MainViewModel.cs",
+          "url": "https://github.com/SoraNoNeko/cpu_net/blob/2a2a148bf025fd026cdd6de153567c4d6dd3dd30/src/ViewModels/MainViewModel.cs"
+        },
+        {
+          "repository": "SoraNoNeko/cpu_net",
+          "commit": "2a2a148bf025fd026cdd6de153567c4d6dd3dd30",
+          "path": "README.md",
+          "url": "https://github.com/SoraNoNeko/cpu_net/blob/2a2a148bf025fd026cdd6de153567c4d6dd3dd30/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "source-device-info",
+        "logout": "protocol-compatible"
+      },
+      "notes": [
+        "只接CPU校园网mode1，不混入172.17.253.3宽带模式",
+        "此模式原始学号无运营商后缀",
+        "状态会话与注销按DrCOM标准兼容独立复核，校内待验证"
+      ]
+    },
+    {
+      "id": "builtin-ahnu",
+      "school": "安徽师范大学",
+      "protocol": "drcom-config",
+      "campus": "未细分校区",
+      "sources": [
+        {
+          "repository": "Aurora1949/AHNU-Portal-Authenticator",
+          "commit": "4ee4437e11202eae70c28c178d34cc3beb394588",
+          "path": "src/model/auth_service.cpp",
+          "url": "https://github.com/Aurora1949/AHNU-Portal-Authenticator/blob/4ee4437e11202eae70c28c178d34cc3beb394588/src/model/auth_service.cpp"
+        },
+        {
+          "repository": "Aurora1949/AHNU-Portal-Authenticator",
+          "commit": "4ee4437e11202eae70c28c178d34cc3beb394588",
+          "path": "src/view/mainwindow.cpp",
+          "url": "https://github.com/Aurora1949/AHNU-Portal-Authenticator/blob/4ee4437e11202eae70c28c178d34cc3beb394588/src/view/mainwindow.cpp"
+        },
+        {
+          "repository": "Aurora1949/AHNU-Portal-Authenticator",
+          "commit": "4ee4437e11202eae70c28c178d34cc3beb394588",
+          "path": "include/common/constants.h",
+          "url": "https://github.com/Aurora1949/AHNU-Portal-Authenticator/blob/4ee4437e11202eae70c28c178d34cc3beb394588/include/common/constants.h"
+        },
+        {
+          "repository": "Aurora1949/AHNU-Portal-Authenticator",
+          "commit": "4ee4437e11202eae70c28c178d34cc3beb394588",
+          "path": "README.md",
+          "url": "https://github.com/Aurora1949/AHNU-Portal-Authenticator/blob/4ee4437e11202eae70c28c178d34cc3beb394588/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "source",
+        "status": "protocol-compatible",
+        "logout": "source"
+      },
+      "notes": [
+        "原始账号无,0,前缀，不要求IP、MAC、callback和jsVersion",
+        "上游默认jsonpReturn包装",
+        "result0/ret_code2只表示已在线，必须独立状态复核"
+      ]
+    },
+    {
+      "id": "builtin-jmu-ruijie",
+      "school": "集美大学",
+      "protocol": "ruijie",
+      "sources": [
+        {
+          "repository": "callmeliwen/RuijiePortalLoginTool",
+          "commit": "a87157ee8811c710d58216e98c1abf98e9e6fb7c",
+          "path": "Linux/ruijie_jmu.sh",
+          "url": "https://github.com/callmeliwen/RuijiePortalLoginTool/blob/a87157ee8811c710d58216e98c1abf98e9e6fb7c/Linux/ruijie_jmu.sh"
+        },
+        {
+          "repository": "callmeliwen/RuijiePortalLoginTool",
+          "commit": "a87157ee8811c710d58216e98c1abf98e9e6fb7c",
+          "path": "README.MD",
+          "url": "https://github.com/callmeliwen/RuijiePortalLoginTool/blob/a87157ee8811c710d58216e98c1abf98e9e6fb7c/README.MD"
+        }
+      ],
+      "evidence": {
+        "login": "POST /eportal/InterFace.do?method=login",
+        "fields": [
+          "userId",
+          "password",
+          "service",
+          "queryString",
+          "operatorPwd",
+          "operatorUserId",
+          "validcode",
+          "passwordEncrypt"
+        ],
+        "passwordEncrypt": "false",
+        "account": "原始完整账号，无自动后缀",
+        "serviceEncoding": "服务中文额外 percent 编码，再经表单编码",
+        "queryEncoding": "按上游raw表单仅将 & 替换为 %2526、= 替换为 %253D，已有%xx和+保留源wire行为",
+        "logout": "先从 /eportal/redirectortosuccess.jsp 获取 userIndex，再 POST method=logout body userIndex=...",
+        "status": "上游使用外网204探针，岚连使用同一ePortal登录/成功页的状态复核",
+        "queryVector": {
+          "query": "wlanuserip=192.0.2.50&opaque=a%2Bb+c%20d",
+          "rawPostQueryValue": "wlanuserip%253D192.0.2.50%2526opaque%253Da%2Bb+c%20d",
+          "afterOneFormParse": "wlanuserip%3D192.0.2.50%26opaque%3Da+b c d"
+        }
+      },
+      "license": "未发现 LICENSE，仅协议事实对照",
+      "notes": [
+        "上游脚本年代较早，适配针对该公开部署，需要当前校内实测",
+        "多次错误可触发验证码，使用页面处理",
+        "JMU旧脚本只编码query分隔符，原始query值里的+或%xx按旧表单规则解释，特殊查询值需要校内复核"
+      ]
+    },
+    {
+      "id": "builtin-wtu-ruijie",
+      "school": "武汉纺织大学",
+      "protocol": "ruijie",
+      "sources": [
+        {
+          "repository": "canfengplaeir/wtu-login",
+          "commit": "a4ae4803b92f81ea159dd7fabcff48f5b1ada03f",
+          "path": "wtu-login",
+          "url": "https://github.com/canfengplaeir/wtu-login/blob/a4ae4803b92f81ea159dd7fabcff48f5b1ada03f/wtu-login"
+        },
+        {
+          "repository": "canfengplaeir/wtu-login",
+          "commit": "a4ae4803b92f81ea159dd7fabcff48f5b1ada03f",
+          "path": "README.md",
+          "url": "https://github.com/canfengplaeir/wtu-login/blob/a4ae4803b92f81ea159dd7fabcff48f5b1ada03f/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "POST /eportal/InterFace.do?method=login",
+        "fields": [
+          "userId",
+          "password",
+          "service",
+          "queryString",
+          "operatorPwd",
+          "operatorUserId",
+          "validcode",
+          "passwordEncrypt"
+        ],
+        "passwordEncrypt": "false",
+        "account": "原始完整账号，无自动后缀",
+        "encoding": "全部普通表单编码",
+        "logout": "上游明确只登录，岚连沿用同协议标准 method=logout + 会话状态复核，待校内验收",
+        "status": "上游能识别success URL，已在线跳过；SSID为WTU-Portal"
+      },
+      "license": "MIT",
+      "notes": [
+        "上游没有注销实现，当前校内注销需要验收",
+        "多网卡时请求源必须与重定向里的IP一致"
+      ]
+    },
+    {
+      "id": "builtin-upc-ruijie",
+      "school": "中国石油大学（华东）",
+      "protocol": "ruijie",
+      "sources": [
+        {
+          "repository": "Iamtianyuyang/UPCnetworklogin",
+          "commit": "f906baff2a6f0214b461df27c1ad09f98afce1e2",
+          "path": "src/portal.rs",
+          "url": "https://github.com/Iamtianyuyang/UPCnetworklogin/blob/f906baff2a6f0214b461df27c1ad09f98afce1e2/src/portal.rs"
+        },
+        {
+          "repository": "Iamtianyuyang/UPCnetworklogin",
+          "commit": "f906baff2a6f0214b461df27c1ad09f98afce1e2",
+          "path": "src/transcode.rs",
+          "url": "https://github.com/Iamtianyuyang/UPCnetworklogin/blob/f906baff2a6f0214b461df27c1ad09f98afce1e2/src/transcode.rs"
+        },
+        {
+          "repository": "Iamtianyuyang/UPCnetworklogin",
+          "commit": "f906baff2a6f0214b461df27c1ad09f98afce1e2",
+          "path": "src/main.rs",
+          "url": "https://github.com/Iamtianyuyang/UPCnetworklogin/blob/f906baff2a6f0214b461df27c1ad09f98afce1e2/src/main.rs"
+        },
+        {
+          "repository": "Iamtianyuyang/UPCnetworklogin",
+          "commit": "f906baff2a6f0214b461df27c1ad09f98afce1e2",
+          "path": "src/config.rs",
+          "url": "https://github.com/Iamtianyuyang/UPCnetworklogin/blob/f906baff2a6f0214b461df27c1ad09f98afce1e2/src/config.rs"
+        },
+        {
+          "repository": "Iamtianyuyang/UPCnetworklogin",
+          "commit": "f906baff2a6f0214b461df27c1ad09f98afce1e2",
+          "path": "README.md",
+          "url": "https://github.com/Iamtianyuyang/UPCnetworklogin/blob/f906baff2a6f0214b461df27c1ad09f98afce1e2/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "POST /eportal/InterFace.do?method=login",
+        "fields": [
+          "userId",
+          "password",
+          "service",
+          "queryString",
+          "operatorPwd",
+          "operatorUserId",
+          "validcode",
+          "passwordEncrypt"
+        ],
+        "passwordEncrypt": "false",
+        "account": "原始完整账号，无自动后缀",
+        "encoding": "账号/密码/服务普通表单编码，queryString专用映射双层wire编码",
+        "queryVector": {
+          "query": "wlanuserip=192.0.2.5&ssid=UPC_WLAN&note=a%2Bb~c",
+          "special": "!\"#$%&'()*+,/:;<=>?@[\\]^_`",
+          "upstreamRawPostQueryValue": "wlanuserip%253D192.0.2.5%2526ssid%253DUPC%255FWLAN%2526note%253Da%25252Bb~c",
+          "ourPreFormValue": "wlanuserip%3D192.0.2.5%26ssid%3DUPC%5FWLAN%26note%3Da%252Bb~c",
+          "explanation": "上游直接把双层wire串拼到raw表单。岚连先把这些字符映射为单层%XX，再经URLSearchParams序列化，form解析一次后的业务queryString与上游一致。未映射字符由普通表单编码往返保持。"
+        },
+        "logout": "POST method=logout 空body，上游接受success或不在线提示",
+        "status": "上游按被拦截状态判断线路，岚连使用登录页/成功页严格复核"
+      },
+      "license": "未发现 LICENSE，仅协议事实对照",
+      "notes": [
+        "多网卡环境需要确保请求源IP和queryString中的wlanuserip相同",
+        "专用query编码要覆盖下划线，不能仅使用普通encodeURIComponent"
+      ]
+    },
+    {
+      "id": "builtin-qust-ruijie",
+      "school": "青岛科技大学",
+      "protocol": "ruijie",
+      "sources": [
+        {
+          "repository": "Mortal-Lonely-Immortal/auto-eportal-openwrt",
+          "commit": "70be7dc3ad9f2ac7cf4a67e7bdfaaf93d8719485",
+          "path": "tools/eportal_login.py",
+          "url": "https://github.com/Mortal-Lonely-Immortal/auto-eportal-openwrt/blob/70be7dc3ad9f2ac7cf4a67e7bdfaaf93d8719485/tools/eportal_login.py"
+        },
+        {
+          "repository": "Mortal-Lonely-Immortal/auto-eportal-openwrt",
+          "commit": "70be7dc3ad9f2ac7cf4a67e7bdfaaf93d8719485",
+          "path": "etc/auto-eportal.conf",
+          "url": "https://github.com/Mortal-Lonely-Immortal/auto-eportal-openwrt/blob/70be7dc3ad9f2ac7cf4a67e7bdfaaf93d8719485/etc/auto-eportal.conf"
+        },
+        {
+          "repository": "Mortal-Lonely-Immortal/auto-eportal-openwrt",
+          "commit": "70be7dc3ad9f2ac7cf4a67e7bdfaaf93d8719485",
+          "path": "README.md",
+          "url": "https://github.com/Mortal-Lonely-Immortal/auto-eportal-openwrt/blob/70be7dc3ad9f2ac7cf4a67e7bdfaaf93d8719485/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "POST /eportal/InterFace.do?method=login",
+        "fields": [
+          "userId",
+          "password",
+          "service",
+          "queryString",
+          "operatorPwd",
+          "operatorUserId",
+          "validcode",
+          "passwordEncrypt"
+        ],
+        "passwordEncrypt": "false",
+        "account": "原始完整账号，无自动后缀",
+        "encoding": "普通表单编码",
+        "logout": "上游未实现注销，岚连采用同标准ePortal method=logout和独立复核，需校内验收",
+        "status": "部署为 t=wireless-v2 定制模板；README提供该IP互联网服务返回resultsuccess的实测记录"
+      },
+      "license": "未发现 LICENSE，仅协议事实对照",
+      "notes": [
+        "校内页面为定制模板，登录后是否走标准success.jsp仍需验收",
+        "上游旧接口自动回退没有引入，当前只使用已核验的新InterFace接口"
+      ]
+    },
+    {
+      "id": "builtin-shu-ruijie",
+      "school": "上海大学",
+      "protocol": "ruijie",
+      "sources": [
+        {
+          "repository": "DongZhouGu/shu-auto-net",
+          "commit": "cba52c916e20c1784f1494ff4cc96424b227e9df",
+          "path": "auto-shunet.py",
+          "url": "https://github.com/DongZhouGu/shu-auto-net/blob/cba52c916e20c1784f1494ff4cc96424b227e9df/auto-shunet.py"
+        },
+        {
+          "repository": "DongZhouGu/shu-auto-net",
+          "commit": "cba52c916e20c1784f1494ff4cc96424b227e9df",
+          "path": "README.md",
+          "url": "https://github.com/DongZhouGu/shu-auto-net/blob/cba52c916e20c1784f1494ff4cc96424b227e9df/README.md"
+        }
+      ],
+      "evidence": {
+        "login": "POST http://10.10.9.9:8080/eportal/InterFace.do?method=login",
+        "fields": [
+          "userId",
+          "password",
+          "passwordEncrypt",
+          "queryString",
+          "service",
+          "operatorPwd",
+          "operatorUserId",
+          "validcode"
+        ],
+        "passwordEncrypt": "false",
+        "account": "原始完整账号，无自动后缀",
+        "encoding": "普通表单编码",
+        "logout": "派生参考 POST method=logout userIndex=当前会话",
+        "status": "原始源码 GET :8080 根页，最终URL含success.jsp判在线",
+        "portEvidence": "原始源码和状态探测均8080；后期派生默认80与README示例存在冲突，选原始强证据8080，由受控发现识别当前网络实际入口"
+      },
+      "license": "原始仓库未发现 LICENSE，仅协议事实对照",
+      "notes": [
+        "学校不同区域可能更新端口，使用当前校园门户自动发现优先",
+        "其余运营商来自派生配置，当前校内登录/注销仍待验收"
+      ]
+    },
+    {
+      "id": "builtin-bit-srun",
+      "school": "北京理工大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "BITNP/bitsrun",
+          "commit": "8567edc17a1570be7804b1f87c1a78514f20e210",
+          "path": "src/bitsrun/user.py",
+          "url": "https://github.com/BITNP/bitsrun/blob/8567edc17a1570be7804b1f87c1a78514f20e210/src/bitsrun/user.py"
+        },
+        {
+          "repository": "BITNP/bitsrun",
+          "commit": "8567edc17a1570be7804b1f87c1a78514f20e210",
+          "path": "src/bitsrun/models.py",
+          "url": "https://github.com/BITNP/bitsrun/blob/8567edc17a1570be7804b1f87c1a78514f20e210/src/bitsrun/models.py"
+        },
+        {
+          "repository": "BITNP/bitsrun",
+          "commit": "8567edc17a1570be7804b1f87c1a78514f20e210",
+          "path": "src/bitsrun/utils.py",
+          "url": "https://github.com/BITNP/bitsrun/blob/8567edc17a1570be7804b1f87c1a78514f20e210/src/bitsrun/utils.py"
+        }
+      ],
+      "license": "WTFPL",
+      "notes": [
+        "同源首页重定向query读取ac_id。源码含rad_user_info状态、get_challenge、login及logout完整流程。"
+      ]
+    },
+    {
+      "id": "builtin-hdu-srun",
+      "school": "杭州电子科技大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "redchenjs/HDU-srun-login-script",
+          "commit": "5b7097fe3d8a43c1e022671e03293d89e782b3f2",
+          "path": "HduSrunLogin/LoginManager.py",
+          "url": "https://github.com/redchenjs/HDU-srun-login-script/blob/5b7097fe3d8a43c1e022671e03293d89e782b3f2/HduSrunLogin/LoginManager.py"
+        }
+      ],
+      "license": "MIT",
+      "notes": [
+        "源码固定ac_id=0、n=200/type=1。源码仅实现登录，状态与注销复用同一SRun CGI协议，需校内确认。"
+      ]
+    },
+    {
+      "id": "builtin-jxnu-srun",
+      "school": "江西师范大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "huxiaofan1223/jxnu_srun",
+          "commit": "c7adf73f99971a092c550d67f26d71bbfe7f4d6f",
+          "path": "jxnu_wifi.py",
+          "url": "https://github.com/huxiaofan1223/jxnu_srun/blob/c7adf73f99971a092c550d67f26d71bbfe7f4d6f/jxnu_wifi.py"
+        },
+        {
+          "repository": "huxiaofan1223/jxnu_srun",
+          "commit": "c7adf73f99971a092c550d67f26d71bbfe7f4d6f",
+          "path": "encryption/srun_md5.py",
+          "url": "https://github.com/huxiaofan1223/jxnu_srun/blob/c7adf73f99971a092c550d67f26d71bbfe7f4d6f/encryption/srun_md5.py"
+        }
+      ],
+      "license": "未见LICENSE，仅协议对照",
+      "notes": [
+        "源码固定ac_id=1，存在rad_user_info状态地址，HMAC以原密码为消息。未给注销实现，需校内验收。"
+      ]
+    },
+    {
+      "id": "builtin-lzu-srun",
+      "school": "兰州大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "Monika-shipship/lzu-network-autologin",
+          "commit": "3ab0b62a2cbb4513d2e898f0294931493d1d31c2",
+          "path": "src/lzu_autologin/config.py",
+          "url": "https://github.com/Monika-shipship/lzu-network-autologin/blob/3ab0b62a2cbb4513d2e898f0294931493d1d31c2/src/lzu_autologin/config.py"
+        },
+        {
+          "repository": "Monika-shipship/lzu-network-autologin",
+          "commit": "3ab0b62a2cbb4513d2e898f0294931493d1d31c2",
+          "path": "src/lzu_autologin/portal.py",
+          "url": "https://github.com/Monika-shipship/lzu-network-autologin/blob/3ab0b62a2cbb4513d2e898f0294931493d1d31c2/src/lzu_autologin/portal.py"
+        },
+        {
+          "repository": "Monika-shipship/lzu-network-autologin",
+          "commit": "3ab0b62a2cbb4513d2e898f0294931493d1d31c2",
+          "path": "config/settings.example.json",
+          "url": "https://github.com/Monika-shipship/lzu-network-autologin/blob/3ab0b62a2cbb4513d2e898f0294931493d1d31c2/config/settings.example.json"
+        }
+      ],
+      "license": "未见LICENSE，仅协议对照",
+      "notes": [
+        "iLZU/LZU，源码默认@study、ac_id=2，完整状态、挑战、登录、注销。保留完整账号选项避免其他服务账号被追加默认后缀。"
+      ]
+    },
+    {
+      "id": "builtin-ucas-srun",
+      "school": "中国科学院大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "iskoldt-X/SRUN-authenticator",
+          "commit": "ef5a63faa118553fd69a0c9a23b7fd01f4b6d32c",
+          "path": "srun_login.py",
+          "url": "https://github.com/iskoldt-X/SRUN-authenticator/blob/ef5a63faa118553fd69a0c9a23b7fd01f4b6d32c/srun_login.py"
+        },
+        {
+          "repository": "iskoldt-X/SRUN-authenticator",
+          "commit": "ef5a63faa118553fd69a0c9a23b7fd01f4b6d32c",
+          "path": "README.md",
+          "url": "https://github.com/iskoldt-X/SRUN-authenticator/blob/ef5a63faa118553fd69a0c9a23b7fd01f4b6d32c/README.md"
+        },
+        {
+          "repository": "iskoldt-X/SRUN-authenticator",
+          "commit": "ef5a63faa118553fd69a0c9a23b7fd01f4b6d32c",
+          "path": "docker-compose.yml",
+          "url": "https://github.com/iskoldt-X/SRUN-authenticator/blob/ef5a63faa118553fd69a0c9a23b7fd01f4b6d32c/docker-compose.yml"
+        }
+      ],
+      "license": "LICENSE.md（请按源文件确认）",
+      "notes": [
+        "源码固定ac_id=1。原脚本rad_user_info指向http://124.16.81.61，适配器仅使用同源HTTPS标准CGI及challenge返回client_ip，需校内核验其同源状态和注销。"
+      ]
+    },
+    {
+      "id": "builtin-ncu-srun",
+      "school": "南昌大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "kaloronahuang/NCU-Srun-Python",
+          "commit": "8f3eeb5ff63ae93a160c25c71e40ccb531019c13",
+          "path": "login.py",
+          "url": "https://github.com/kaloronahuang/NCU-Srun-Python/blob/8f3eeb5ff63ae93a160c25c71e40ccb531019c13/login.py"
+        },
+        {
+          "repository": "kaloronahuang/NCU-Srun-Python",
+          "commit": "8f3eeb5ff63ae93a160c25c71e40ccb531019c13",
+          "path": "config.json",
+          "url": "https://github.com/kaloronahuang/NCU-Srun-Python/blob/8f3eeb5ff63ae93a160c25c71e40ccb531019c13/config.json"
+        },
+        {
+          "repository": "kaloronahuang/NCU-Srun-Python",
+          "commit": "8f3eeb5ff63ae93a160c25c71e40ccb531019c13",
+          "path": "README.md",
+          "url": "https://github.com/kaloronahuang/NCU-Srun-Python/blob/8f3eeb5ff63ae93a160c25c71e40ccb531019c13/README.md"
+        },
+        {
+          "repository": "kaloronahuang/NCU-Srun-Python",
+          "commit": "8f3eeb5ff63ae93a160c25c71e40ccb531019c13",
+          "path": "encryption/srun_md5.py",
+          "url": "https://github.com/kaloronahuang/NCU-Srun-Python/blob/8f3eeb5ff63ae93a160c25c71e40ccb531019c13/encryption/srun_md5.py"
+        }
+      ],
+      "license": "GPLv2，仅协议对照，不复制源码",
+      "notes": [
+        "ac_id由入口实际URL动态读取，四种运营商后缀来自README。源码含真实成功响应示例。未实现状态/注销，使用标准SRun CGI并复核，需校内验收。"
+      ]
+    },
+    {
+      "id": "builtin-ncepu-srun",
+      "school": "华北电力大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "lxydiy/srun-portal-ncepu",
+          "commit": "8f038ab0ae71b25e16e8688f0eb99d80024d8729",
+          "path": "main.cpp",
+          "url": "https://github.com/lxydiy/srun-portal-ncepu/blob/8f038ab0ae71b25e16e8688f0eb99d80024d8729/main.cpp"
+        },
+        {
+          "repository": "lxydiy/srun-portal-ncepu",
+          "commit": "8f038ab0ae71b25e16e8688f0eb99d80024d8729",
+          "path": "README.md",
+          "url": "https://github.com/lxydiy/srun-portal-ncepu/blob/8f038ab0ae71b25e16e8688f0eb99d80024d8729/README.md"
+        }
+      ],
+      "license": "未见LICENSE，仅协议对照",
+      "notes": [
+        "源码固定ac_id=1、HMAC密码消息、n=200/type=1。仅证实登录，状态/注销按标准SRun CGI实现，尚待校内验证。"
+      ]
+    },
+    {
+      "id": "builtin-sdu-srun",
+      "school": "山东大学",
+      "protocol": "srun",
+      "sources": [
+        {
+          "repository": "Bingtao-Wang/Srun_login",
+          "commit": "7b0f3353b62f603c6ea9dc3a99df8b0771e71859",
+          "path": "srun_login.ps1",
+          "url": "https://github.com/Bingtao-Wang/Srun_login/blob/7b0f3353b62f603c6ea9dc3a99df8b0771e71859/srun_login.ps1"
+        },
+        {
+          "repository": "Bingtao-Wang/Srun_login",
+          "commit": "7b0f3353b62f603c6ea9dc3a99df8b0771e71859",
+          "path": "README.md",
+          "url": "https://github.com/Bingtao-Wang/Srun_login/blob/7b0f3353b62f603c6ea9dc3a99df8b0771e71859/README.md"
+        }
+      ],
+      "license": "未见LICENSE，仅协议对照",
+      "notes": [
+        "源码默认网关和ac_id=1，challenge响应client_ip提供设备IP，HMAC消息为密码。校区未在源码明确，不扩称所有山大网络。仅证实登录，状态/注销按标准SRun CGI实现，尚待校内验证。"
+      ]
+    }
+  ]
+}

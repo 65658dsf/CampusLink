@@ -153,10 +153,10 @@ class CampusService extends EventEmitter {
       this.log('warning', '本地配置无法读取，已使用默认设置。原文件将保留至下次保存。', false);
     }
   }
-  persist() {
+  persist({ settings = this.settings, profiles = this.externalProfiles, credential = this.credential } = {}) {
     fs.mkdirSync(this.directory, { recursive: true });
     const temp = `${this.file}.${process.pid}.tmp`;
-    const content = JSON.stringify({ version: 1, settings: this.settings, profiles: this.externalProfiles, credential: this.settings.rememberPassword ? this.credential : null }, null, 2);
+    const content = JSON.stringify({ version: 1, settings, profiles, credential: settings.rememberPassword ? credential : null }, null, 2);
     try { fs.writeFileSync(temp, content, { mode: 0o600 }); fs.renameSync(temp, this.file); }
     catch { try { fs.unlinkSync(temp); } catch {} throw new Error('无法保存本地配置，请检查文件夹权限。'); }
   }
@@ -378,16 +378,24 @@ class CampusService extends EventEmitter {
     const profile = parseProfile(text);
     if (this.externalProfiles.some(p => p.id === profile.id)) throw new Error('此方案 ID 已存在，请先移除旧方案或更改 ID。');
     if (this.externalProfiles.length >= 30) throw new Error('最多导入 30 个外部方案。');
-    this.externalProfiles.push(profile); this.persist(); this.log('success', '外部连接方案已导入。'); return this.snapshot();
+    const profiles = [...this.externalProfiles, profile];
+    this.persist({ profiles });
+    this.externalProfiles = profiles;
+    this.log('success', '外部连接方案已导入。'); return this.snapshot();
   }
   removeProfile(id) {
     this.assertIdle();
     if (builtinProfiles.some(p => p.id === id)) throw new Error('内置方案不能移除。');
     this.profile(id);
     if (this.session?.profileId === id || (this.connection.status === 'connected' && this.settings.profileId === id)) throw new Error('请先断开当前认证，再移除方案。');
-    this.externalProfiles = this.externalProfiles.filter(p => p.id !== id);
-    if (this.settings.profileId === id) { this.stopMonitoring(); this.reconnectContext = null; this.settings = { ...this.settings, profileId: '', parameters: {}, autoConnect: false }; this.credential = null; this.connection = IDLE(); }
-    this.persist(); this.log('info', '外部连接方案已移除。'); return this.snapshot();
+    const profiles = this.externalProfiles.filter(p => p.id !== id);
+    const selected = this.settings.profileId === id;
+    const settings = selected ? { ...this.settings, profileId: '', parameters: {}, autoConnect: false } : this.settings;
+    const credential = selected ? null : this.credential;
+    this.persist({ settings, profiles, credential });
+    this.externalProfiles = profiles;
+    if (selected) { this.stopMonitoring(); this.reconnectContext = null; this.settings = settings; this.credential = credential; this.connection = IDLE(); }
+    this.log('info', '外部连接方案已移除。'); return this.snapshot();
   }
   clearCredentials() {
     this.assertIdle(); this.credential = null;

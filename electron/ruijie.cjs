@@ -2,18 +2,41 @@
 
 // NingMeng123 — controlled ePortal Web adapter. Protocol reference and original
 // RSA test vector: LFWQSP2641/scu_net_auto_login (see assets/licenses).
+// Dynamic pageInfo wire fields are independently implemented from
+// SWUOSA/ruijie-authentication, commit 1c4918833eaa249b45edcbe590cc5ae2364c905f.
 const { CampusError, parseJsonOrJsonp } = require('./transport.cjs');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
 const MAX_HOPS = 6;
 const MAX_QUERY = 16384;
 const PATHS = { login: '/eportal/index.jsp', online: '/eportal/success.jsp', api: '/eportal/InterFace.do' };
+// UPC's published client escapes this exact ASCII set before form serialization.
+const UPC_QUERY_ESCAPES = new Set(Array.from('!"#$%&\'()*+,/:;<=>?@[\\]^_`'));
+
+function encodeQuery(query, encoding) {
+  if (encoding === 'percent') return encodeURIComponent(query);
+  if (encoding !== 'upc') return query;
+  return Array.from(query, character => UPC_QUERY_ESCAPES.has(character)
+    ? `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    : character).join('');
+}
+
+function rsaKeyValues(publicKey, code = 'INVALID_PROFILE') {
+  const invalid = () => { throw new CampusError('锐捷 RSA 公钥无效，未提交账号密码。', code); };
+  if (!publicKey || typeof publicKey !== 'object' || Array.isArray(publicKey)) invalid();
+  const { exponent: exponentHex, modulus: modulusHex } = publicKey;
+  // Bound strings before BigInt conversion, including keys from pageInfo.
+  if (typeof exponentHex !== 'string' || exponentHex.length > 8 || !/^[0-9a-f]+$/i.test(exponentHex) ||
+      typeof modulusHex !== 'string' || modulusHex.length > 1024 || !/^[0-9a-f]+$/i.test(modulusHex)) invalid();
+  const exponent = BigInt(`0x${exponentHex}`);
+  const modulus = BigInt(`0x${modulusHex}`);
+  const bits = modulus.toString(2).length;
+  if (bits < 512 || bits > 4096 || !(modulus & 1n) || exponent < 3n || exponent > 0xffffffffn || !(exponent & 1n)) invalid();
+  return { exponent, modulus, bits };
+}
 
 function rsaEncrypt(value, publicKey) {
-  const exponent = BigInt(`0x${publicKey.exponent}`);
-  const modulus = BigInt(`0x${publicKey.modulus}`);
-  const bits = modulus.toString(2).length;
-  if (bits < 512 || bits > 4096 || !(modulus & 1n) || exponent < 3n || exponent > 0xffffffffn || !(exponent & 1n)) throw new CampusError('锐捷 RSA 公钥配置无效。', 'INVALID_PROFILE');
+  const { exponent, modulus, bits } = rsaKeyValues(publicKey);
   // This legacy browser protocol packs UTF-16 code units into little-endian
   // words. Reversing code units is intentional; UTF-8/OAEP would not match it.
   const input = String(value).split('').reverse().map(character => character.charCodeAt(0));
@@ -32,6 +55,23 @@ function rsaEncrypt(value, publicKey) {
     parts.push(encrypted.toString(16).padStart(Math.ceil(bits / 4), '0'));
   }
   return parts.join(' ');
+}
+
+function rsaEncryptUtf8(value, publicKey) {
+  const { exponent, modulus, bits } = rsaKeyValues(publicKey);
+  // SWU's published client treats UTF-8 bytes as a single big-endian integer
+  // and emits unpadded hex. Do not silently reduce an oversized credential.
+  const bytes = Buffer.from(value, 'utf8');
+  if (!bytes.length || bytes.length > Math.ceil(bits / 8)) throw new CampusError('密码与设备信息过长，无法使用此校园认证方式。', 'INVALID_PARAMETERS');
+  let factor = BigInt(`0x${bytes.toString('hex')}`);
+  if (factor >= modulus) throw new CampusError('密码与设备信息过长，无法使用此校园认证方式。', 'INVALID_PARAMETERS');
+  let power = exponent, encrypted = 1n;
+  while (power) {
+    if (power & 1n) encrypted = encrypted * factor % modulus;
+    factor = factor * factor % modulus;
+    power >>= 1n;
+  }
+  return encrypted.toString(16);
 }
 
 function encryptPassword(password, mac, publicKey) {
@@ -85,6 +125,7 @@ function userIndexFrom(url, text = '') {
 function createPortalSession(profile, requester, onSecret) {
   const cookies = new Map();
   let discoveredEntry = profile.discoveredEntry;
+  let landingUrl;
   const secrets = [];
   const remember = value => { if (typeof value === 'string' && value && !secrets.includes(value)) { secrets.push(value); onSecret(value); } };
   function acceptCookies(url, values = []) {
@@ -153,7 +194,8 @@ function createPortalSession(profile, requester, onSecret) {
         return { online: true, userIndex, message: '已通过锐捷校园网认证。' };
       }
       if (current.origin === new URL(profile.homepage).origin && current.pathname.toLowerCase() === PATHS.login) {
-        const context = queryContext(current, profile.ruijie.passwordWithMac !== false);
+        const context = queryContext(current, profile.ruijie.passwordMode !== 'plain' && profile.ruijie.passwordWithMac !== false);
+        landingUrl = current.href;
         remember(context.queryString); remember(context.mac);
         return { online: false, ...context, message: '当前尚未通过锐捷校园网认证。' };
       }
@@ -164,13 +206,26 @@ function createPortalSession(profile, requester, onSecret) {
   async function api(method, values) {
     const url = new URL(PATHS.api, profile.homepage);
     url.searchParams.set('method', method);
+    let body = new URLSearchParams(values).toString();
+    if (method === 'login' && profile.ruijie.queryEncoding === 'jmu') {
+      // The referenced JMU client pre-encodes only query delimiters and then
+      // places that component directly in the form body.
+      body = Object.entries(values).map(([key, value]) => key === 'queryString'
+        ? `queryString=${value.replace(/&/g, '%2526').replace(/=/g, '%253D')}`
+        : new URLSearchParams({ [key]: value }).toString()).join('&');
+    }
     const response = await send(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Referer: profile.homepage },
-      body: new URLSearchParams(values).toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Referer: profile.homepage,
+        ...(profile.ruijie.publicKeySource === 'page-info' ? { Origin: url.origin, Referer: landingUrl || profile.homepage } : {}),
+      },
+      body,
     });
+    if (response.status >= 300 && response.status < 400) throw new CampusError('锐捷接口返回了未允许的跳转。', 'PORTAL_REDIRECT');
+    if (response.status < 200 || response.status >= 300) throw new CampusError('锐捷认证服务器暂时不可用。', 'HTTP_ERROR');
     const data = parseJsonOrJsonp(response.body);
-    if (!data || typeof data !== 'object' || Array.isArray(data) || typeof data.result !== 'string') throw new CampusError('锐捷认证服务器返回了无法识别的结果。', 'INVALID_RESPONSE');
+    if (!data || typeof data !== 'object' || Array.isArray(data) || (method !== 'pageInfo' && typeof data.result !== 'string')) throw new CampusError('锐捷认证服务器返回了无法识别的结果。', 'INVALID_RESPONSE');
     remember(data.userIndex);
     return data;
   }
@@ -207,11 +262,20 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
     const service = context.parameters?.service ?? profile.fields?.find(field => field.key === 'service')?.default ?? '';
     const serviceRequired = profile.ruijie.serviceOptional !== true;
     if ((serviceRequired && !service) || !context.username || !context.password) throw new CampusError(serviceRequired ? '请填写校园网账号、密码并选择网络服务。' : '请填写校园网账号和密码。', 'INVALID_PARAMETERS');
-    // Password-only encryption is opt-in; both built-in ePortal schools use
-    // the default `password>mac` transform.
-    const password = profile.ruijie.passwordWithMac === false
-      ? rsaEncrypt(context.password, profile.ruijie.publicKey)
-      : encryptPassword(context.password, status.mac, profile.ruijie.publicKey);
+    // Dynamic keys belong only to this login; never cache or persist them.
+    const plainPassword = profile.ruijie.passwordMode === 'plain';
+    let publicKey = profile.ruijie.publicKey;
+    if (!plainPassword && profile.ruijie.publicKeySource === 'page-info') {
+      const info = await portal.api('pageInfo', { queryString: status.queryString });
+      publicKey = { exponent: info.publicKeyExponent, modulus: info.publicKeyModulus };
+      rsaKeyValues(publicKey, 'PORTAL_PUBLIC_KEY');
+      if (Object.hasOwn(info, 'result') && info.result !== 'success') throw new CampusError('锐捷服务器未提供可用的认证配置。', 'PORTAL_PUBLIC_KEY');
+    }
+    let password = context.password;
+    if (!plainPassword) {
+      const secret = profile.ruijie.passwordWithMac === false ? context.password : `${context.password}>${status.mac}`;
+      password = profile.ruijie.passwordEncoding === 'utf8' ? rsaEncryptUtf8(secret, publicKey) : rsaEncrypt(secret, publicKey);
+    }
     portal.remember(password);
     // CDUT-Yibin pre-encodes the account and query string once before the
     // portal form is serialized, so both appear double-encoded on the wire.
@@ -219,7 +283,7 @@ async function ruijieOperation(profile, operation, context, requester, onSecret 
     data = await portal.api('login', {
       userId: encodeValue(context.username), password,
       service: profile.ruijie.serviceEncoding === 'percent' ? encodeURIComponent(service) : service,
-      queryString: encodeValue(status.queryString), operatorPwd: '', operatorUserId: '', validcode: '', passwordEncrypt: 'true',
+      queryString: encodeQuery(status.queryString, profile.ruijie.queryEncoding || profile.ruijie.valueEncoding), operatorPwd: '', operatorUserId: '', validcode: '', passwordEncrypt: plainPassword ? 'false' : 'true',
     });
   } else {
     // SCU's own Go implementation uses an empty logout body; deployments which

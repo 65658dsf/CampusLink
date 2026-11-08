@@ -2,7 +2,7 @@
 
 开发者：**NingMeng123** · [GitHub](https://github.com/65658dsf/CampusLink)
 
-本教程适用于**锐捷 ePortal Web 网页认证**。岚连内置贵州轻工职业大学 Dr.COM、四川大学与成都理工大学（宜宾校区）锐捷方案，也允许导入其他学校的锐捷 JSON 配置。首次打开需在“连接方案”中搜索并选择学校，不预选默认方案。认证入口优先从当前网络探测；方案只描述参数，不执行导入文件中的脚本。
+本教程适用于**锐捷 ePortal Web 网页认证**。岚连内置贵州轻工职业大学 Dr.COM、四川大学与成都理工大学（宜宾校区）锐捷方案，新增西南大学动态公钥方案，仍待校内实测；也允许导入其他学校的锐捷 JSON 配置。首次打开需在“连接方案”中搜索并选择学校，不预选默认方案。认证入口优先从当前网络探测；方案只描述参数，不执行导入文件中的脚本。
 
 四川大学配置来自公开源码对照；当前没有在四川大学真实校园网进行登录、注销或重连验收。本机模拟服务可检查请求、编码和状态处理，但不能证明学校当前部署接受这些参数。
 
@@ -192,3 +192,7 @@ node -e "const fs=require('node:fs'); const {parseProfile}=require('./electron/p
 - 同作者 Go 实现固定提交 `8677927e207befa520cbe3ccbfcc4ea4ea56a0af`：[川大空正文注销及响应判断](https://github.com/LFWQSP2641/scunet-auto-login/blob/8677927e207befa520cbe3ccbfcc4ea4ea56a0af/pkg/schools/scu/portal/rvjx/logout.go)。
 
 RSA 兼容实现及测试向量的上游 MIT 许可完整保存在 [scu-net-auto-login-MIT.txt](../assets/licenses/scu-net-auto-login-MIT.txt)，保留 `Copyright (c) 2026 LFWQSP2641`。岚连的集成、配置和文档开发者为 **NingMeng123**。
+
+## 动态公钥方案
+
+西南大学内置方案设置 `publicKeySource: "page-info"`、`passwordEncoding: "utf8"` 和默认服务“默认”。登录前只向已发现的认证源请求 `InterFace.do?method=pageInfo`，校验公钥后按该学校规则加密；动态模式不填写 `publicKey`，也不持久保存返回的公钥。原有静态公钥方案的编码和流程保持不变。参数说明、固定源码与注销验收边界见 [高校接入记录](university-adapters.md#西南大学)。

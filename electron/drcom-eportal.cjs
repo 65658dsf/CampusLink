@@ -71,6 +71,69 @@ function resultAccepted(data) {
   return flags[0];
 }
 
+// NingMeng123 — CQU's public client obtains device identity from chkstatus,
+// not a landing form. result=1 without uid identifies a device, not a session.
+async function cquOperation(profile, operation, context, gateway, send, remember) {
+  async function status() {
+    const url = apiUrl(profile.homepage, '/drcom/chkstatus', [
+      ['callback', 'dr1002'], ['jsVersion', '4.X'], ['v', Date.now()], ['lang', 'zh'],
+    ]);
+    const data = parseJsonOrJsonp((await send(url)).body);
+    if (!data || typeof data !== 'object' || Array.isArray(data)
+      || typeof data.v46ip !== 'string' || isIP(data.v46ip) !== 4
+      || ['0.0.0.0', '255.255.255.255'].includes(data.v46ip)
+      || Object.hasOwn(data, 'result') && ![0, '0', 1, '1'].includes(data.result)
+      || ['resCode', 'rescode'].some(key => Object.hasOwn(data, key) && ![0, '0'].includes(data[key]))
+      || Object.hasOwn(data, 'uid') && (typeof data.uid !== 'string' || data.uid.length > 500 || /[\u0000-\u001f\u007f]/.test(data.uid))) {
+      throw new CampusError('重庆大学认证服务器未返回有效设备状态，未提交账号密码。', 'UNKNOWN_RESPONSE');
+    }
+    const online = typeof data.uid === 'string' && Boolean(data.uid.trim());
+    if (online && [0, '0'].includes(data.result)) throw new CampusError('重庆大学认证状态与会话信息不一致。', 'AMBIGUOUS_RESPONSE');
+    remember(data.v46ip); remember(data.uid);
+    return statusResult(online, data);
+  }
+
+  if (operation === 'status') return status();
+  let url, initial;
+  if (operation === 'login') {
+    if (typeof context.username !== 'string' || !context.username || typeof context.password !== 'string' || !context.password) {
+      throw new CampusError('请填写校园网账号和密码。', 'INVALID_PARAMETERS');
+    }
+    initial = await status();
+    if (initial.online) return { ...initial, message: '当前设备已通过校园网认证，无需重复登录。' };
+    const account = `,0,${context.username}`;
+    remember(account);
+    url = apiUrl(gateway, '/eportal/portal/login', [
+      ['callback', 'dr1004'], ['login_method', '1'],
+      ['user_account', account], ['user_password', context.password],
+      ['wlan_user_ip', initial.ip], ['wlan_user_ipv6', ''], ['wlan_user_mac', '000000000000'],
+      ['wlan_ac_ip', ''], ['wlan_ac_name', ''],
+      ['term_ua', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0'],
+      ['term_type', '1'], ['jsVersion', '4.2.2'], ['terminal_type', '1'],
+      ['lang', 'zh-cn'], ['v', Date.now()], ['lang', 'zh-cn'],
+    ]);
+  } else {
+    // This explicit session logout needs neither account credentials nor MAC
+    // unbinding. Device bindings remain managed by the school's own portal.
+    url = apiUrl(gateway, '/eportal/portal/logout');
+  }
+  const body = (await send(url)).body;
+  if (!(operation === 'logout' && body.trim() === 'Radius注销成功！')) {
+    const data = parseJsonOrJsonp(body);
+    if (!resultAccepted(data)) {
+      const detail = [data.msg, data.msga, data.message].find(value => typeof value === 'string')?.slice(0, 300);
+      throw new CampusError(`${operation === 'login' ? '校园网认证被拒绝，请检查账号、密码或账号状态。' : '校园网注销未成功，请打开认证页确认。'}${detail ? ` 服务器提示：${detail}` : ''}`, 'AUTH_REJECTED');
+    }
+  }
+  let verified;
+  try { verified = await status(); }
+  catch { throw new CampusError('服务器已接受请求，但无法确认校园网状态，请检测状态或打开认证页。', 'VERIFY_FAILED'); }
+  if (verified.online !== (operation === 'login') || operation === 'login' && verified.ip !== initial.ip) {
+    throw new CampusError(operation === 'login' ? '服务器已接受认证请求，但尚未确认当前设备在线，请打开认证页检查。' : '服务器已接受注销请求，但状态仍为在线，请打开认证页检查。', 'VERIFY_FAILED');
+  }
+  return { ...verified, message: operation === 'login' ? '已通过校园网认证。' : '已退出校园网认证。' };
+}
+
 async function drcomEportalOperation(profile, operation, context = {}, requester = portalRequest, registerSecret = () => {}) {
   if (!['login', 'logout', 'status'].includes(operation)) throw new CampusError('不支持的 Dr.COM ePortal 操作。', 'UNSUPPORTED_OPERATION');
   const origin = new URL(profile.homepage).origin;
@@ -107,6 +170,8 @@ async function drcomEportalOperation(profile, operation, context = {}, requester
       throw error;
     }
   }
+
+  if (profile.drcomEportal?.dialect === 'cqu') return cquOperation(profile, operation, context, gateway, send, remember);
 
   async function landing(useDiscoveredEntry = false) {
     let current = entryUrl(useDiscoveredEntry && profile.discoveredEntry || profile.homepage, profile.homepage, origin);

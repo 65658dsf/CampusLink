@@ -32,6 +32,22 @@ test('discovers a changed DrCOM IP without using the old configured server', asy
   assert.equal(f.requests.length, 2);
 });
 
+test('v4 API evidence identifies differently named login pages without executing them', async () => {
+  const entry = 'http://10.8.6.20/campus/index.html';
+  const body = '<html><form><input name="DDDDD"><input name="upass"></form><script>var api="/eportal/portal/login";</script></html>';
+  const f = fixture({ [PROBE]: { status: 302, location: entry }, [entry]: { body } });
+  assert.equal((await discoverPortal(profile('drcom-eportal'), f.requester)).entryUrl, entry);
+  assert.equal(f.requests.length, 2);
+});
+
+test('read-only discovery never executes MAC unbinding redirects', async () => {
+  for (const path of ['/eportal/portal/mac/unbind', '/eportal/portal/mac/bind', '/eportal/?c=Portal&a=unbind', '/portal.htm?action=kick']) {
+    const f = fixture({ [PROBE]: { status: 302, location: `http://10.8.6.20${path}` } });
+    assert.equal(await discoverPortal(profile('drcom-eportal'), f.requester), null);
+    assert.equal(f.requests.length, 1);
+  }
+});
+
 test('Ruijie uses the full HTTP / JS / meta discovery chain, preserving only the temporary entry query', async () => {
   const entry = 'http://10.8.6.22/eportal/index.jsp?mac=aa-bb-cc-dd-ee-ff&ip=172.16.3.4';
   const f = fixture({

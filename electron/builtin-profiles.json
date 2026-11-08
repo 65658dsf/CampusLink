@@ -1,0 +1,1416 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "builtin-gzqy",
+    "name": "贵州轻工职业大学",
+    "description": "内置 Dr.COM 校园网认证 · 请先连接校园 Wi-Fi 或有线网络",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.151.253.10/",
+    "protocol": "drcom",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络类型",
+        "default": "1",
+        "options": [
+          {
+            "label": "校园网",
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-scu-ruijie",
+    "name": "四川大学 · 锐捷 ePortal",
+    "description": "参考四川大学锐捷 ePortal 认证流程；请先连接对应校园网络，并选择账号开通的服务。其他学校请导入匹配的锐捷方案。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://192.168.2.135/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "internet",
+        "options": [
+          {
+            "label": "校园网（internet）",
+            "value": "internet"
+          },
+          {
+            "label": "电信出口",
+            "value": "电信出口"
+          },
+          {
+            "label": "移动出口",
+            "value": "移动出口"
+          },
+          {
+            "label": "联通出口",
+            "value": "联通出口"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://192.168.2.135/",
+      "redirectOrigins": [
+        "http://123.123.123.123"
+      ],
+      "publicKey": {
+        "modulus": "94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871",
+        "exponent": "10001"
+      },
+      "serviceEncoding": "percent"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-cdut-yibin-ruijie",
+    "name": "成都理工大学（宜宾校区）· 锐捷 ePortal",
+    "description": "成都理工大学宜宾校区锐捷 ePortal 认证（2026-10-16 依据真实抓包核验）；请先连接 CDUTYB-WEB 无线或校园有线网络。登录不选择网络服务，使用学校统一认证账号。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.26.30.253/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "ruijie": {
+      "discoveryUrl": "http://10.26.30.253/",
+      "redirectOrigins": [],
+      "publicKey": {
+        "modulus": "94dd2a8675fb779e6b9f7103698634cd400f27a154afa67af6166a43fc26417222a79506d34cacc7641946abda1785b7acf9910ad6a0978c91ec84d40b71d2891379af19ffb333e7517e390bd26ac312fe940c340466b4a5d4af1d65c3b5944078f96a1a51a5a53e4bc302818b7c9f63c4a1b07bd7d874cef1c3d4b2f5eb7871",
+        "exponent": "10001"
+      },
+      "serviceOptional": true,
+      "valueEncoding": "percent",
+      "serviceEncoding": "plain"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-jdztc",
+    "name": "景德镇陶瓷大学 · Dr.COM ePortal",
+    "description": "依据真实网页选项和电信请求适配 Dr.COM ePortal；先连接 JCU、JCI 等校园网络，选择对应运营商，填写学号和云陶密码。已有匹配后缀不会重复添加，完整账号模式保留输入；校内成功认证仍需验证。",
+    "version": "1.1.0",
+    "author": "NingMeng123",
+    "homepage": "http://172.29.0.2/a79.htm",
+    "protocol": "drcom-eportal",
+    "timeoutMs": 10000,
+    "drcomEportal": {
+      "variant": "portal-v4",
+      "apiPort": 801
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "运营商",
+        "default": "telecom",
+        "options": [
+          {
+            "label": "中国电信",
+            "value": "telecom"
+          },
+          {
+            "label": "中国移动",
+            "value": "cmcc"
+          },
+          {
+            "label": "中国联通",
+            "value": "unicom"
+          },
+          {
+            "label": "测试",
+            "value": "xyw"
+          },
+          {
+            "label": "其他（使用完整账号）",
+            "value": "raw"
+          }
+        ]
+      }
+    ],
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-cqu",
+    "name": "重庆大学 · Dr.COM ePortal",
+    "description": "重庆大学 CQU 电脑端校园网认证；使用学校完整账号，不自动添加运营商后缀。已对照 GitHub 源码并通过本地模拟验证，登录、状态及普通注销仍待校内实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://login.cqu.edu.cn/",
+    "protocol": "drcom-eportal",
+    "timeoutMs": 10000,
+    "drcomEportal": {
+      "variant": "portal-v4",
+      "apiPort": 801,
+      "dialect": "cqu"
+    },
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": []
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-swu-ruijie",
+    "name": "西南大学 · 锐捷 ePortal",
+    "description": "西南大学 SWU 锐捷网页认证；使用校园网账号与默认服务，每次登录获取当前门户公钥。已对照 GitHub 源码并通过本地模拟验证，真实校内登录、状态及注销仍待实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://222.198.127.170/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "默认",
+        "options": [
+          {
+            "label": "默认",
+            "value": "默认"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://222.198.127.170/",
+      "redirectOrigins": [
+        "http://123.123.123.123"
+      ],
+      "publicKeySource": "page-info",
+      "passwordEncoding": "utf8",
+      "serviceEncoding": "plain"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-drcom-auto",
+    "name": "Dr.COM 自动识别 · 通用方案",
+    "description": "自动发现当前校园网并读取认证接口、端口、账号前缀和运营商配置。适用于可识别的 Dr.COM Web / ePortal 网页认证；遇到额外加密或不明确参数时提示补充配置。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://www.msftconnecttest.com/redirect",
+    "protocol": "drcom-auto",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络服务",
+        "default": "auto",
+        "options": [
+          {
+            "label": "自动（使用网页默认服务）",
+            "value": "auto"
+          },
+          {
+            "label": "校园网",
+            "value": "campus"
+          },
+          {
+            "label": "中国电信",
+            "value": "telecom"
+          },
+          {
+            "label": "中国移动",
+            "value": "cmcc"
+          },
+          {
+            "label": "中国联通",
+            "value": "unicom"
+          },
+          {
+            "label": "完整账号（不追加后缀）",
+            "value": "raw"
+          }
+        ]
+      },
+      {
+        "key": "portalUrl",
+        "label": "认证页（可选）",
+        "default": "",
+        "placeholder": "留空自动发现，例如 http://10.0.0.1/"
+      },
+      {
+        "key": "apiPort",
+        "label": "认证端口（可选）",
+        "default": "",
+        "placeholder": "留空自动读取，例如 801"
+      },
+      {
+        "key": "accountPrefix",
+        "label": "账号前缀（auto 自动 / none 无）",
+        "default": "auto",
+        "placeholder": "auto 自动；none 无前缀；或填写 ,0,"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-hnust",
+    "name": "湖南科技大学 · Dr.COM v4",
+    "description": "湖南科技大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://192.168.254.226/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络服务",
+        "default": "auto",
+        "options": [
+          {
+            "label": "默认服务",
+            "value": "auto"
+          },
+          {
+            "label": "校园网",
+            "value": "campus"
+          },
+          {
+            "label": "中国电信",
+            "value": "telecom"
+          },
+          {
+            "label": "中国移动",
+            "value": "cmcc"
+          },
+          {
+            "label": "中国联通",
+            "value": "unicom"
+          },
+          {
+            "label": "完整账号（不追加后缀）",
+            "value": "raw"
+          }
+        ]
+      }
+    ],
+    "drcomConfig": {
+      "mode": "v4",
+      "apiPort": 801,
+      "accountPrefix": ",0,",
+      "jsVersion": "4.2.1",
+      "operatorMode": "suffix",
+      "operators": [
+        {
+          "label": "校园网",
+          "value": ""
+        },
+        {
+          "label": "中国电信",
+          "value": "@telecom"
+        },
+        {
+          "label": "中国移动",
+          "value": "@cmcc"
+        },
+        {
+          "label": "中国联通",
+          "value": "@unicom"
+        }
+      ],
+      "defaultOperator": "",
+      "loginFields": [
+        {
+          "key": "callback",
+          "value": "dr1003"
+        },
+        {
+          "key": "login_method",
+          "value": "1"
+        },
+        {
+          "key": "user_account",
+          "value": "{{account}}"
+        },
+        {
+          "key": "user_password",
+          "value": "{{password}}"
+        },
+        {
+          "key": "wlan_user_ip",
+          "value": "{{ip}}"
+        },
+        {
+          "key": "wlan_user_ipv6",
+          "value": ""
+        },
+        {
+          "key": "wlan_user_mac",
+          "value": "000000000000"
+        },
+        {
+          "key": "wlan_ac_ip",
+          "value": ""
+        },
+        {
+          "key": "wlan_ac_name",
+          "value": ""
+        },
+        {
+          "key": "jsVersion",
+          "value": "4.2.1"
+        },
+        {
+          "key": "terminal_type",
+          "value": "1"
+        },
+        {
+          "key": "lang",
+          "value": "zh-cn"
+        },
+        {
+          "key": "v",
+          "value": "{{nonce}}"
+        },
+        {
+          "key": "lang",
+          "value": "zh"
+        }
+      ],
+      "requireIp": true,
+      "macMode": "zero",
+      "statusMode": "identity",
+      "logoutMode": "v4",
+      "logoutFields": []
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-szu",
+    "name": "深圳大学 · Dr.COM v4",
+    "description": "深圳大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://172.30.255.42/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [],
+    "drcomConfig": {
+      "mode": "v4",
+      "apiPort": 801,
+      "accountPrefix": ",1,",
+      "jsVersion": "4.X",
+      "operatorMode": "none",
+      "operators": [],
+      "defaultOperator": "",
+      "loginFields": [
+        {
+          "key": "callback",
+          "value": "dr1003"
+        },
+        {
+          "key": "login_method",
+          "value": "1"
+        },
+        {
+          "key": "user_account",
+          "value": "{{account}}"
+        },
+        {
+          "key": "user_password",
+          "value": "{{password}}"
+        }
+      ],
+      "requireIp": false,
+      "macMode": "zero",
+      "statusMode": "identity",
+      "logoutMode": "v4",
+      "logoutFields": []
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-yau",
+    "name": "延安大学 · Dr.COM v4",
+    "description": "延安大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.200.84.3/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络服务",
+        "default": "auto",
+        "options": [
+          {
+            "label": "默认服务",
+            "value": "auto"
+          },
+          {
+            "label": "原始账号",
+            "value": "raw"
+          },
+          {
+            "label": "电信",
+            "value": "telecom"
+          },
+          {
+            "label": "联通",
+            "value": "unicom"
+          }
+        ]
+      }
+    ],
+    "drcomConfig": {
+      "mode": "v4",
+      "apiPort": 801,
+      "accountPrefix": ",0,",
+      "jsVersion": "4.X",
+      "operatorMode": "suffix",
+      "operators": [
+        {
+          "label": "原始账号",
+          "value": ""
+        },
+        {
+          "label": "电信",
+          "value": "@dx"
+        },
+        {
+          "label": "联通",
+          "value": "@lt"
+        }
+      ],
+      "defaultOperator": "",
+      "loginFields": [
+        {
+          "key": "callback",
+          "value": "dr1003"
+        },
+        {
+          "key": "login_method",
+          "value": "1"
+        },
+        {
+          "key": "user_account",
+          "value": "{{account}}"
+        },
+        {
+          "key": "user_password",
+          "value": "{{password}}"
+        },
+        {
+          "key": "wlan_user_ip",
+          "value": "{{ip}}"
+        },
+        {
+          "key": "wlan_user_ipv6",
+          "value": ""
+        },
+        {
+          "key": "wlan_user_mac",
+          "value": "{{mac}}"
+        },
+        {
+          "key": "wlan_ac_ip",
+          "value": ""
+        },
+        {
+          "key": "wlan_ac_name",
+          "value": ""
+        },
+        {
+          "key": "jsVersion",
+          "value": "4.2.1"
+        },
+        {
+          "key": "terminal_type",
+          "value": "1"
+        },
+        {
+          "key": "v",
+          "value": "{{nonce}}"
+        },
+        {
+          "key": "lang",
+          "value": "zh"
+        }
+      ],
+      "requireIp": true,
+      "macMode": "portal",
+      "statusMode": "result",
+      "logoutMode": "v4",
+      "logoutFields": [],
+      "statusFields": [
+        {
+          "key": "callback",
+          "value": "dr1003"
+        },
+        {
+          "key": "jsVersion",
+          "value": "4.X"
+        },
+        {
+          "key": "v",
+          "value": "{{nonce}}"
+        },
+        {
+          "key": "lang",
+          "value": "zh"
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-nufe",
+    "name": "南京财经大学 · Dr.COM Web",
+    "description": "南京财经大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.200.253.5/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络服务",
+        "default": "auto",
+        "options": [
+          {
+            "label": "默认服务",
+            "value": "auto"
+          },
+          {
+            "label": "中国移动",
+            "value": "cmcc"
+          },
+          {
+            "label": "中国电信",
+            "value": "telecom"
+          },
+          {
+            "label": "完整账号（不追加后缀）",
+            "value": "raw"
+          }
+        ]
+      }
+    ],
+    "drcomConfig": {
+      "mode": "web",
+      "apiPort": 80,
+      "accountPrefix": "",
+      "jsVersion": "4.X",
+      "operatorMode": "suffix",
+      "operators": [
+        {
+          "label": "中国移动",
+          "value": "@cmcc"
+        },
+        {
+          "label": "中国电信",
+          "value": "@njxy"
+        }
+      ],
+      "defaultOperator": "@cmcc",
+      "loginFields": [
+        {
+          "key": "callback",
+          "value": "campusProbe"
+        },
+        {
+          "key": "DDDDD",
+          "value": "{{account}}"
+        },
+        {
+          "key": "upass",
+          "value": "{{password}}"
+        },
+        {
+          "key": "0MKKey",
+          "value": "123456"
+        },
+        {
+          "key": "R1",
+          "value": "0"
+        },
+        {
+          "key": "R3",
+          "value": "0"
+        },
+        {
+          "key": "R6",
+          "value": "0"
+        },
+        {
+          "key": "para",
+          "value": "00"
+        },
+        {
+          "key": "v6ip",
+          "value": ""
+        }
+      ],
+      "requireIp": false,
+      "macMode": "zero",
+      "statusMode": "result",
+      "logoutMode": "drcom",
+      "logoutFields": [
+        {
+          "key": "callback",
+          "value": "campusProbe"
+        }
+      ],
+      "statusFields": [
+        {
+          "key": "callback",
+          "value": "campusProbe"
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-seu",
+    "name": "东南大学 · Dr.COM legacy ePortal",
+    "description": "东南大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "https://w.seu.edu.cn/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [],
+    "drcomConfig": {
+      "mode": "legacy",
+      "apiPort": 801,
+      "accountPrefix": ",0,",
+      "jsVersion": "4.X",
+      "operatorMode": "none",
+      "operators": [],
+      "defaultOperator": "",
+      "loginFields": [
+        {
+          "key": "c",
+          "value": "Portal"
+        },
+        {
+          "key": "a",
+          "value": "login"
+        },
+        {
+          "key": "callback",
+          "value": "dr1003"
+        },
+        {
+          "key": "login_method",
+          "value": "1"
+        },
+        {
+          "key": "user_account",
+          "value": "{{account}}"
+        },
+        {
+          "key": "user_password",
+          "value": "{{password}}"
+        },
+        {
+          "key": "wlan_user_ip",
+          "value": "{{ip}}"
+        }
+      ],
+      "requireIp": true,
+      "macMode": "zero",
+      "statusMode": "result",
+      "logoutMode": "drcom",
+      "logoutFields": [
+        {
+          "key": "callback",
+          "value": "dr1003"
+        }
+      ],
+      "statusFields": [
+        {
+          "key": "callback",
+          "value": "dr1002"
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-cpu",
+    "name": "中国药科大学 · Dr.COM legacy ePortal",
+    "description": "中国药科大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://192.168.199.21/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [],
+    "drcomConfig": {
+      "mode": "legacy",
+      "apiPort": 801,
+      "accountPrefix": ",0,",
+      "jsVersion": "3.3.3",
+      "operatorMode": "none",
+      "operators": [],
+      "defaultOperator": "",
+      "loginFields": [
+        {
+          "key": "c",
+          "value": "Portal"
+        },
+        {
+          "key": "a",
+          "value": "login"
+        },
+        {
+          "key": "callback",
+          "value": "dr1004"
+        },
+        {
+          "key": "login_method",
+          "value": "1"
+        },
+        {
+          "key": "user_account",
+          "value": "{{account}}"
+        },
+        {
+          "key": "user_password",
+          "value": "{{password}}"
+        },
+        {
+          "key": "wlan_user_ip",
+          "value": "{{ip}}"
+        },
+        {
+          "key": "wlan_user_ipv6",
+          "value": ""
+        },
+        {
+          "key": "wlan_user_mac",
+          "value": "000000000000"
+        },
+        {
+          "key": "wlan_ac_ip",
+          "value": ""
+        },
+        {
+          "key": "wlan_ac_name",
+          "value": ""
+        },
+        {
+          "key": "jsVersion",
+          "value": "3.3.3"
+        },
+        {
+          "key": "v",
+          "value": "{{nonce}}"
+        }
+      ],
+      "requireIp": true,
+      "macMode": "zero",
+      "statusMode": "identity",
+      "logoutMode": "drcom",
+      "logoutFields": [
+        {
+          "key": "callback",
+          "value": "dr1003"
+        },
+        {
+          "key": "jsVersion",
+          "value": "3.3.3"
+        }
+      ],
+      "statusFields": [
+        {
+          "key": "callback",
+          "value": "dr1002"
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-ahnu",
+    "name": "安徽师范大学 · Dr.COM v4",
+    "description": "安徽师范大学电脑端网页认证，依据 GitHub 源码配置账号格式、接口端口和服务。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://100.64.4.10/",
+    "protocol": "drcom-config",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络服务",
+        "default": "auto",
+        "options": [
+          {
+            "label": "默认服务",
+            "value": "auto"
+          },
+          {
+            "label": "中国移动",
+            "value": "cmcc"
+          },
+          {
+            "label": "中国电信",
+            "value": "telecom"
+          },
+          {
+            "label": "中国联通",
+            "value": "unicom"
+          },
+          {
+            "label": "完整账号 / 模式二",
+            "value": "raw"
+          }
+        ]
+      }
+    ],
+    "drcomConfig": {
+      "mode": "v4",
+      "apiPort": 801,
+      "accountPrefix": "",
+      "jsVersion": "4.X",
+      "operatorMode": "suffix",
+      "operators": [
+        {
+          "label": "中国移动",
+          "value": "@cmcc"
+        },
+        {
+          "label": "中国电信",
+          "value": "@telecom"
+        },
+        {
+          "label": "中国联通",
+          "value": "@unicom"
+        },
+        {
+          "label": "完整账号 / 模式二",
+          "value": ""
+        }
+      ],
+      "defaultOperator": "@cmcc",
+      "loginFields": [
+        {
+          "key": "user_account",
+          "value": "{{account}}"
+        },
+        {
+          "key": "user_password",
+          "value": "{{password}}"
+        }
+      ],
+      "requireIp": false,
+      "macMode": "zero",
+      "statusMode": "identity",
+      "logoutMode": "v4",
+      "logoutFields": []
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-jmu-ruijie",
+    "name": "集美大学 · 锐捷 ePortal",
+    "description": "集美大学锐捷 ePortal 网页认证，按 GitHub 参考实现适配。先连接校园网络，选择已开通服务，使用完整学校账号。登录、状态及注销仍待校内实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://210.34.130.210/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "教育网接入",
+        "options": [
+          {
+            "label": "教育网接入",
+            "value": "教育网接入"
+          },
+          {
+            "label": "移动宽带接入",
+            "value": "移动宽带接入"
+          },
+          {
+            "label": "电信宽带接入",
+            "value": "电信宽带接入"
+          },
+          {
+            "label": "联通宽带接入",
+            "value": "联通宽带接入"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://210.34.130.210/",
+      "redirectOrigins": [],
+      "passwordMode": "plain",
+      "serviceEncoding": "percent",
+      "queryEncoding": "jmu"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-wtu-ruijie",
+    "name": "武汉纺织大学 · 锐捷 ePortal",
+    "description": "武汉纺织大学锐捷 ePortal 网页认证，按 GitHub 参考实现适配。先连接校园网络，选择已开通服务，使用完整学校账号。登录、状态及注销仍待校内实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://172.30.1.111/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "DX",
+        "options": [
+          {
+            "label": "中国电信",
+            "value": "DX"
+          },
+          {
+            "label": "中国移动",
+            "value": "YD"
+          },
+          {
+            "label": "中国联通",
+            "value": "LT"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://172.30.1.111/",
+      "redirectOrigins": [],
+      "passwordMode": "plain",
+      "serviceEncoding": "plain"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-upc-ruijie",
+    "name": "中国石油大学（华东） · 锐捷 ePortal",
+    "description": "中国石油大学（华东）锐捷 ePortal 网页认证，按 GitHub 参考实现适配。先连接校园网络，选择已开通服务，使用完整学校账号。登录、状态及注销仍待校内实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://wlan.upc.edu.cn/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "cmcc",
+        "options": [
+          {
+            "label": "中国移动",
+            "value": "cmcc"
+          },
+          {
+            "label": "中国联通",
+            "value": "unicom"
+          },
+          {
+            "label": "中国电信",
+            "value": "ctcc"
+          },
+          {
+            "label": "校园网",
+            "value": "default"
+          },
+          {
+            "label": "本地网络",
+            "value": "local"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://wlan.upc.edu.cn/",
+      "redirectOrigins": [],
+      "passwordMode": "plain",
+      "serviceEncoding": "plain",
+      "queryEncoding": "upc"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-qust-ruijie",
+    "name": "青岛科技大学 · 锐捷 ePortal",
+    "description": "青岛科技大学锐捷 ePortal 网页认证，按 GitHub 参考实现适配。先连接校园网络，选择已开通服务，使用完整学校账号。登录、状态及注销仍待校内实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://211.87.158.84/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "internet",
+        "options": [
+          {
+            "label": "互联网",
+            "value": "internet"
+          },
+          {
+            "label": "内网",
+            "value": "local"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://211.87.158.84/",
+      "redirectOrigins": [],
+      "passwordMode": "plain",
+      "serviceEncoding": "plain"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-shu-ruijie",
+    "name": "上海大学 · 锐捷 ePortal",
+    "description": "上海大学锐捷 ePortal 网页认证，按 GitHub 参考实现适配。先连接校园网络，选择已开通服务，使用完整学校账号。登录、状态及注销仍待校内实测。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.10.9.9:8080/",
+    "protocol": "ruijie",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "service",
+        "label": "网络服务",
+        "default": "shu",
+        "options": [
+          {
+            "label": "校园网",
+            "value": "shu"
+          },
+          {
+            "label": "中国电信",
+            "value": "dx"
+          },
+          {
+            "label": "中国联通",
+            "value": "lt"
+          },
+          {
+            "label": "中国移动",
+            "value": "yd"
+          }
+        ]
+      }
+    ],
+    "ruijie": {
+      "discoveryUrl": "http://10.10.9.9:8080/",
+      "redirectOrigins": [
+        "http://123.123.123.123"
+      ],
+      "passwordMode": "plain",
+      "serviceEncoding": "plain"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-bit-srun",
+    "name": "北京理工大学 · 深澜 Srun",
+    "description": "北京理工大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.0.0.55/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [],
+    "srun": {
+      "acId": "auto",
+      "hmacMode": "empty"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-hdu-srun",
+    "name": "杭州电子科技大学 · 深澜 Srun",
+    "description": "杭州电子科技大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "https://login.hdu.edu.cn/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [],
+    "srun": {
+      "acId": "0",
+      "hmacMode": "empty"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-jxnu-srun",
+    "name": "江西师范大学 · 深澜 Srun",
+    "description": "江西师范大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://172.16.8.6/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [],
+    "srun": {
+      "acId": "1",
+      "hmacMode": "password"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-lzu-srun",
+    "name": "兰州大学 · 深澜 Srun",
+    "description": "兰州大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://10.10.0.166/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [
+      {
+        "key": "suffix",
+        "label": "网络服务",
+        "default": "@study",
+        "options": [
+          {
+            "label": "校园网（@study）",
+            "value": "@study"
+          },
+          {
+            "label": "完整账号（保留输入后缀）",
+            "value": ""
+          }
+        ]
+      }
+    ],
+    "srun": {
+      "acId": "2",
+      "hmacMode": "password"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-ucas-srun",
+    "name": "中国科学院大学 · 深澜 Srun",
+    "description": "中国科学院大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "https://portal.ucas.ac.cn/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [],
+    "srun": {
+      "acId": "1",
+      "hmacMode": "password"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-ncu-srun",
+    "name": "南昌大学 · 深澜 Srun",
+    "description": "南昌大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://222.204.3.154/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [
+      {
+        "key": "suffix",
+        "label": "网络服务",
+        "default": "@ncu",
+        "options": [
+          {
+            "label": "校园网",
+            "value": "@ncu"
+          },
+          {
+            "label": "中国移动",
+            "value": "@cmcc"
+          },
+          {
+            "label": "中国电信",
+            "value": "@ndcard"
+          },
+          {
+            "label": "中国联通",
+            "value": "@unicom"
+          },
+          {
+            "label": "完整账号",
+            "value": ""
+          }
+        ]
+      }
+    ],
+    "srun": {
+      "acId": "auto",
+      "hmacMode": "password"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-ncepu-srun",
+    "name": "华北电力大学 · 深澜 Srun",
+    "description": "华北电力大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://202.204.67.15/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [],
+    "srun": {
+      "acId": "1",
+      "hmacMode": "password"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-sdu-srun",
+    "name": "山东大学 · 深澜 Srun",
+    "description": "山东大学深澜网页认证，依据 GitHub 源码设置网关、AC 标识与密码协议。请先连接对应校园网络。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://192.168.75.252/",
+    "protocol": "srun",
+    "timeoutMs": 10000,
+    "fields": [],
+    "srun": {
+      "acId": "1",
+      "hmacMode": "password"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-gznu-sangfor",
+    "name": "贵州师范大学 · 深信服 Portal",
+    "description": "依据 GitHub 贵师大登录脚本接入深信服 Portal，自动生成密码变换与 auth_tag。默认入口来自公开源码，入口变化时可填写当前认证页。登录、状态及注销仍待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://1.1.1.3/ac_portal/20191008142058/pc.html?template=20191008142058&tabs=pwd",
+    "protocol": "sangfor",
+    "timeoutMs": 10000,
+    "fields": [
+      {
+        "key": "portalUrl",
+        "label": "认证页（入口变化时填写）",
+        "default": "",
+        "placeholder": "留空使用公开源码中的入口"
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "id": "builtin-gzmu-drcom-auto",
+    "name": "贵州民族大学 · Dr.COM 自动识别",
+    "description": "依据 GitHub 贵州民族大学自动登录脚本接入。当前入口、端口、账号格式和服务后缀从校园认证页读取。公开脚本未给出完整网关地址，发现失败时填写浏览器中的认证页。待校内验收。",
+    "version": "1.0.0",
+    "author": "NingMeng123",
+    "homepage": "http://www.msftconnecttest.com/redirect",
+    "protocol": "drcom-auto",
+    "timeoutMs": 10000,
+    "portalDiscovery": {
+      "url": "http://www.msftconnecttest.com/redirect"
+    },
+    "fields": [
+      {
+        "key": "operator",
+        "label": "网络服务",
+        "default": "auto",
+        "options": [
+          { "label": "自动（使用网页默认服务）", "value": "auto" },
+          { "label": "学生内网 / 校园网", "value": "campus" },
+          { "label": "办公网", "value": "office" },
+          { "label": "中国电信", "value": "telecom" },
+          { "label": "中国移动", "value": "cmcc" },
+          { "label": "中国联通", "value": "unicom" },
+          { "label": "完整账号（不追加后缀）", "value": "raw" }
+        ]
+      },
+      {
+        "key": "portalUrl",
+        "label": "认证页（可选）",
+        "default": "",
+        "placeholder": "留空自动发现，或填写浏览器中的认证页地址"
+      },
+      {
+        "key": "apiPort",
+        "label": "认证端口（可选）",
+        "default": "",
+        "placeholder": "留空自动读取"
+      },
+      {
+        "key": "accountPrefix",
+        "label": "账号前缀（auto 自动 / none 无）",
+        "default": "auto",
+        "placeholder": "auto 自动；none 无前缀；或填写 ,0,"
+      }
+    ]
+  }
+]
